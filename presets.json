@@ -1,164 +1,90 @@
 {
-  "Main_Account_Sniper": {
-    "token": "TOKEN",
-    "channel_id": 123456789012345678,
-    "prefix": "!",
-    "mudae_prefix": "$",
-    "roll_command": "wa",
-    "rolling": true,
-    "use_slash_rolls": true,
-    "roll_speed": 1.2,
-    "delay_seconds": 15,
-    "start_delay": 5,
-    "min_kakera": 450,
-    "key_mode": false,
-    "only_chaos": false,
-    "time_rolls_to_claim_reset": true,
-    "dk_power_management": true,
-    "skip_initial_commands": false,
-    "wishlist": [
-      "rem",
-      "makima",
-      "power",
-      "zero two"
-    ],
-    "snipe_mode": true,
-    "snipe_delay": 0.2,
-    "snipe_ignore_min_kakera_reset": true,
-    "series_wishlist": [
-      "chainsaw man",
-      "re:zero"
-    ],
-    "series_snipe_mode": true,
-    "series_snipe_delay": 0.5,
-    "kakera_snipe_mode": true,
-    "kakera_snipe_threshold": 400,
-    "reactive_snipe_on_own_rolls": true,
-    "reactive_snipe_delay": 0,
-    "rt_ignore_min_kakera_for_wishlist": true,
-    "rt_only_self_rolls": false,
-    "kakera_reaction_snipe_mode": true,
-    "kakera_reaction_snipe_delay": 0.3,
-    "kakera_reaction_snipe_targets": [],
-    "claim_interval": 180,
-    "roll_interval": 60,
-    "reactive_kakera_delay_range": [
-      0.3,
-      0.8
-    ],
-    "kakera_power_thresholds": {
-      "kakeraY": 70,
-      "kakeraO": 80
-    },
-    "humanization_enabled": true,
-    "humanization_window_minutes": 20,
-    "humanization_inactivity_seconds": 180,
-    "autostart": true,
-    "claim_emojis": [
-      "💖",
-      "💗",
-      "💘",
-      "❤️",
-      "💓",
-      "💕",
-      "♥️"
-    ],
-    "kakera_emojis": [
-      "kakeraY",
-      "kakeraO",
-      "kakeraR",
-      "kakeraW",
-      "kakeraL",
-      "kakeraP",
-      "kakeraD",
-      "kakeraC"
-    ],
-    "chaos_emojis": [
-      "kakeraY",
-      "kakeraO",
-      "kakeraR",
-      "kakeraW",
-      "kakeraL",
-      "kakeraP",
-      "kakeraD",
-      "kakeraC"
-    ]
-  },
-  "Secondary_Account_Farmer": {
-    "token": "TOKEN",
-    "channel_id": 123456789012345678,
-    "prefix": "!",
-    "mudae_prefix": "$",
-    "roll_command": "ha",
-    "rolling": true,
-    "use_slash_rolls": false,
-    "roll_speed": 0.5,
-    "delay_seconds": 8,
-    "start_delay": 10,
-    "min_kakera": 150,
-    "key_mode": true,
-    "only_chaos": true,
-    "time_rolls_to_claim_reset": false,
-    "dk_power_management": true,
-    "skip_initial_commands": true,
-    "wishlist": [],
-    "snipe_mode": false,
-    "snipe_delay": 1.5,
-    "snipe_ignore_min_kakera_reset": false,
-    "series_wishlist": [],
-    "series_snipe_mode": false,
-    "series_snipe_delay": 2.0,
-    "kakera_snipe_mode": true,
-    "kakera_snipe_threshold": 100,
-    "reactive_snipe_on_own_rolls": true,
-    "reactive_snipe_delay": 0.5,
-    "rt_ignore_min_kakera_for_wishlist": true,
-    "rt_only_self_rolls": true,
-    "kakera_reaction_snipe_mode": true,
-    "kakera_reaction_snipe_delay": 1.0,
-    "kakera_reaction_snipe_targets": [],
-    "claim_interval": 180,
-    "roll_interval": 60,
-    "reactive_kakera_delay_range": [
-      0.5,
-      1.5
-    ],
-    "kakera_power_thresholds": {
-      "kakeraY": 80,
-      "kakeraO": 90
-    },
-    "humanization_enabled": false,
-    "humanization_window_minutes": 10,
-    "humanization_inactivity_seconds": 60,
-    "autostart": false,
-    "claim_emojis": [
-      "💖",
-      "💗",
-      "💘",
-      "❤️",
-      "💓",
-      "💕",
-      "♥️"
-    ],
-    "kakera_emojis": [
-      "kakeraY",
-      "kakeraO",
-      "kakeraR",
-      "kakeraW",
-      "kakeraL",
-      "kakeraP",
-      "kakeraD",
-      "kakeraC"
-    ],
-    "chaos_emojis": [
-      "kakeraY",
-      "kakeraO",
-      "kakeraR",
-      "kakeraW",
-      "kakeraL",
-      "kakeraP",
-      "kakeraD",
-      "kakeraC"
-    ]
-  }
+    "Main": {
+        "token": "TOKeN",
+        "prefix": "/////////////////////",
+        "mudae_prefix": "$",
+        "channel_id": 12345,
+        "roll_command": "/wa",
+        "min_kakera": 200,
+        "delay_seconds": 10.0,
+        "start_delay": 3,
+        "roll_speed": 2.5,
+        "snipe_delay": 10.0,
+        "series_snipe_delay": 10.0,
+        "kakera_snipe_threshold": 250,
+        "kakera_reaction_snipe_delay": 10.0,
+        "humanization_window_minutes": 15,
+        "humanization_inactivity_seconds": 120,
+        "reactive_snipe_delay": 1.0,
+        "rolling": true,
+        "use_slash_rolls": true,
+        "snipe_mode": false,
+        "snipe_ignore_min_kakera_reset": false,
+        "series_snipe_mode": false,
+        "kakera_snipe_mode": true,
+        "kakera_reaction_snipe_mode": false,
+        "reactive_snipe_on_own_rolls": true,
+        "key_mode": true,
+        "only_chaos": false,
+        "humanization_enabled": true,
+        "dk_power_management": true,
+        "dk_activation_percent": 15,
+        "skip_initial_commands": true,
+        "time_rolls_to_claim_reset": false,
+        "rt_ignore_min_kakera_for_wishlist": true,
+        "rt_only_self_rolls": true,
+        "auto_us_enabled": false,
+        "auto_us_stop_on_claim": true,
+        "autostart": false,
+        "debug_mode": false,
+        "wishlist": [
+            "Hatsune Miku",
+            "Megumin",
+            "Saber"
+        ],
+        "series_wishlist": [],
+        "avoid_list": [],
+        "kakera_reaction_snipe_targets": [],
+        "kakera_emojis": [
+            "kakeraC",
+            "kakeraD",
+            "kakeraR",
+            "kakeraW",
+            "kakeraP",
+            "kakeraL",
+            "kakeraY"
+        ],
+        "chaos_emojis": [
+            "kakeraC",
+            "kakeraD",
+            "kakeraR",
+            "kakeraW",
+            "kakeraP",
+            "kakeraL",
+            "kakeraY"
+        ],
+        "sphere_perk_emojis": [
+            "kakeraC",
+            "kakeraD",
+            "kakeraR",
+            "kakeraW",
+            "kakeraP",
+            "kakeraL",
+            "kakeraY"
+        ],
+        "inactive_hours": [
+            [
+                2,
+                7
+            ]
+        ],
+        "reactive_kakera_delay_range": [
+            0.5,
+            2.0
+        ],
+        "kakera_power_thresholds": {
+            "chaos_kakeraY": 50,
+            "chaos_sphere_kakeraY": 0
+        }
+    }
 }
