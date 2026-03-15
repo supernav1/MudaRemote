@@ -24,87 +24,7 @@ except ImportError:
 
 # Bot Identification
 BOT_NAME = "MudaRemote"
-CURRENT_VERSION = "3.6.6"
-
-# --- UPDATE CONFIGURATION ---
-# Replace this URL with your GitHub RAW URL for version.json and the script itself
-UPDATE_URL = "https://raw.githubusercontent.com/misutesu-desu/MudaRemote/refs/heads/main/" 
-
-def check_for_updates():
-    if not UPDATE_URL:
-        return
-    
-    print(f"[{BOT_NAME}] Checking for updates... (Current: v{CURRENT_VERSION})")
-    try:
-        # Check version.json
-        # Format: {"version": "2.6.0", "download_url": "...", "editor_download_url": "..."}
-        response = requests.get(f"{UPDATE_URL}version.json", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            latest_version = data.get("version")
-            download_url = data.get("download_url")
-            
-            if latest_version and latest_version > CURRENT_VERSION:
-                print(f"[{BOT_NAME}] New version found: v{latest_version}")
-                print(f"[{BOT_NAME}] Downloading update...")
-                
-                # Download new script
-                update_res = requests.get(download_url, timeout=30)
-                if update_res.status_code == 200:
-                    current_script = os.path.abspath(__file__)
-                    backup_script = current_script + ".bak"
-                    
-                    # Create backup
-                    shutil.copy2(current_script, backup_script)
-                    
-                    # Replace current script
-                    with open(current_script, "wb") as f:
-                        f.write(update_res.content)
-                    
-                    # Also update the preset editor
-                    script_dir = os.path.dirname(current_script)
-                    editor_path = os.path.join(script_dir, "mudae_preset_editor.py")
-                    editor_url = data.get("editor_download_url", f"{UPDATE_URL}mudae_preset_editor.py")
-                    try:
-                        editor_res = requests.get(editor_url, timeout=30)
-                        if editor_res.status_code == 200:
-                            if os.path.exists(editor_path):
-                                shutil.copy2(editor_path, editor_path + ".bak")
-                            with open(editor_path, "wb") as f:
-                                f.write(editor_res.content)
-                            print(f"[{BOT_NAME}] Preset editor updated.")
-                        else:
-                            print(f"[{BOT_NAME}] Failed to download preset editor update.")
-                    except Exception as e:
-                        print(f"[{BOT_NAME}] Preset editor update failed: {e}")
-                    
-                    print(f"[{BOT_NAME}] Update applied. Starting new version in a fresh window...")
-                    # Restart process
-                    if os.name == 'nt':
-                        # On Windows, launch in a new console window
-                        subprocess.Popen([sys.executable] + sys.argv, creationflags=subprocess.CREATE_NEW_CONSOLE)
-                    else:
-                        os.execv(sys.executable, [sys.executable] + sys.argv)
-                    sys.exit()
-                else:
-                    print(f"[{BOT_NAME}] Failed to download update file.")
-            else:
-                print(f"[{BOT_NAME}] You are up to date.")
-    except Exception as e:
-        print(f"[{BOT_NAME}] Update check failed: {e}")
-
-def cleanup_after_update():
-    """Removes the backup files created during the update process."""
-    current_script = os.path.abspath(__file__)
-    script_dir = os.path.dirname(current_script)
-    
-    for bak_file in [current_script + ".bak", os.path.join(script_dir, "mudae_preset_editor.py.bak")]:
-        if os.path.exists(bak_file):
-            try:
-                os.remove(bak_file)
-                print(f"[{BOT_NAME}] Backup cleaned: {os.path.basename(bak_file)}")
-            except Exception:
-                pass
+CURRENT_VERSION = "3.6.4"
 
 # Load config
 presets = {}
@@ -275,7 +195,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             claim_interval_preset, roll_interval_preset, avoid_list,
             inactive_hours_preset,
             auto_us_enabled, auto_us_limit, auto_us_stop_on_claim,
-            kakera_power_thresholds, debug_mode, auto_mk_enabled_preset):
+            kakera_power_thresholds, dk_activation_percent, debug_mode):
 
     client = commands.Bot(command_prefix=prefix, chunk_guilds_at_startup=False, self_bot=True)
 
@@ -341,8 +261,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.auto_us_limit = auto_us_limit
     client.auto_us_stop_on_claim = auto_us_stop_on_claim
     client.us_pulled_this_cycle = 0
-    client.mk_rolls_left = 0
-    client.auto_mk_enabled = auto_mk_enabled_preset
 
     # State tracking
     client.next_claim_reset_at_utc = None
@@ -817,29 +735,31 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             # Handling PT-BR translation variance: "reação" vs "botão", Spanish/French: "botón"/"bouton"
             consumption_match = re.search(r"(?:each kakera (?:reaction|button) consumes|cada (?:reação|botão|botón) de kakera consume|chaque bouton kakera consomme)\s*(\d+)%", content_lower)
             
-            if not power_match or not consumption_match:
-                log_function(f"[{client.muda_name}] DK: Parse failed (power/consumption).", preset_name, "WARN")
+            if not power_match:
+                log_function(f"[{client.muda_name}] DK: Parse failed (power).", preset_name, "WARN")
                 return
-            
+        
             current_power = int(power_match.group(1))
-            consumption_cost = int(consumption_match.group(1))
-            
-            effective_cost = consumption_cost
-            if getattr(client, 'only_chaos', False):
-                effective_cost = int(consumption_cost / 2)
+        
+            # Use item if power is below configured threshold
+            if current_power < dk_activation_percent:
+                log_function(
+                    f"[{client.muda_name}] DK: Activating. ({current_power}% < {dk_activation_percent}%)",
+                    preset_name,
+                    "KAKERA"
+                )
 
-            # Use item if power is too low for the required reaction type
-            if current_power < effective_cost:
-                log_function(f"[{client.muda_name}] DK: Activating. ({current_power}% < {effective_cost}%)", preset_name, "KAKERA")
                 await channel.send(f"{client.mudae_prefix}dk")
-                await asyncio.sleep(1.5) 
+                await asyncio.sleep(1.5)
+            
+                # Immediately update local power state
+                client.current_dk_power = 100
+                client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
+                
                 client.dk_stock_count = max(0, client.dk_stock_count - 1)
-            else:
-                pass
-
+        
         except Exception as e:
-            log_function(f"[{client.muda_name}] DK logic error: {e}", preset_name, "ERROR")
-
+            log_function(f"[{client.muda_name}] DK: Error parsing power: {e}", preset_name, "ERROR")
 
     async def snipe_only_status_loop(client, channel):
         """
@@ -1136,21 +1056,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         immediate_roll = (client.rolling_enabled and proceed_to_rolls and 
                          (can_claim or client.key_mode or client.rt_available or is_timing_window))
         
-        # Globally parse $mk available from $tu
-        mk_match = re.search(r"\(\+\*{0,2}([\d,.]+)\*{0,2}\s+\$mk\)", c_lower)
-        if mk_match:
-            client.mk_rolls_left = int(re.sub(r"[^\d]", "", mk_match.group(1)))
-        else:
-            client.mk_rolls_left = 0
-            
-        if client.rolling_enabled and proceed_to_rolls and not immediate_roll:
-            # If we're not doing normal rolls but have enough power and $mk left, use them before sleeping
-            if client.auto_mk_enabled and client.mk_rolls_left > 0 and get_current_dk_power() >= client.dk_consumption:
-                await process_mk_rolls(client, channel)
-                await asyncio.sleep(2)
-                await check_status(client, channel, mudae_prefix)
-                return
-        
         if immediate_roll:
             await check_rolls_left_tu(client, channel, mudae_prefix, log_function, preset_name,
                                       tu_message_content, 
@@ -1215,7 +1120,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             middle_text = main_match.group(2)
             
             # Separate $us and $mk parsing.
-            # $us are actual rolls we can use. $mk summon guaranteed kakera characters.
+            # $us are actual rolls we can use. $mk are passive and should be ignored for calculation.
             for bonus_match in re.finditer(r"\(\+\*{0,2}([\d,.]+)\*{0,2}\s+\$(us|mk)\)", middle_text):
                 amount = parse_int_from_fragment(bonus_match.group(1))
                 bonus_type = bonus_match.group(2).lower()
@@ -1223,7 +1128,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 if bonus_type == "us":
                     us_rolls_left += amount
                 elif bonus_type == "mk":
-                    client.mk_rolls_left = amount
+                    pass 
 
             # Parse reset time
             # Unified Reset Regex: "Reset in... X min"
@@ -1299,39 +1204,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             log_function(f"[{client.muda_name}] Could not parse roll count.", preset_name, "ERROR")
             await asyncio.sleep(30); await check_status(client, channel, mudae_prefix); return
 
-    async def process_mk_rolls(client, channel):
-        if not getattr(client, 'auto_mk_enabled', True):
-            return
-        if client.mk_rolls_left > 0:
-            current_pow = get_current_dk_power()
-            if current_pow >= client.dk_consumption:
-                mk_used = 0
-                while client.mk_rolls_left > 0 and get_current_dk_power() >= client.dk_consumption:
-                    log_function(f"[{client.muda_name}] Using $mk ({client.mk_rolls_left} left, Power: {get_current_dk_power()}%)", client.preset_name, "KAKERA")
-                    await channel.send(f"{client.mudae_prefix}mk")
-                    client.mk_rolls_left -= 1
-                    mk_used += 1
-                    await asyncio.sleep(3)  # Wait for Mudae to respond with character + kakera
-                    
-                    # Find and click the kakera on the $mk response
-                    mk_start = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=5)
-                    async for mk_msg in channel.history(limit=5, after=mk_start, oldest_first=False):
-                        if mk_msg.author.id == TARGET_BOT_ID and mk_msg.embeds:
-                            mk_embed = mk_msg.embeds[0]
-                            if is_character_embed(mk_embed) and mk_msg.components:
-                                await claim_character(client, channel, mk_msg, is_kakera=True)
-                                break
-                    await asyncio.sleep(1)
-                
-                if mk_used > 0:
-                    log_function(f"[{client.muda_name}] Used {mk_used} $mk rolls.", client.preset_name, "KAKERA")
-            else:
-                log_function(f"[{client.muda_name}] Skipping $mk: Insufficient power ({current_pow}% < {client.dk_consumption}%).", client.preset_name, "INFO")
-
     async def start_roll_commands(client, channel, rolls_left, ignore_limit_for_post_roll, key_mode_only_kakera_for_post_roll):
-        # Auto $mk: Use $mk rolls before normal rolls if we have enough power
-        await process_mk_rolls(client, channel)
-        
         log_text = f"Rolling {rolls_left} times"
         log_text += " (Reactive)" if client.enable_reactive_self_snipe else ""
         log_function(f"[{client.muda_name}] {log_text}", client.preset_name, "INFO")
@@ -1403,7 +1276,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         except Exception as e:
             log_function(f"[{client.muda_name}] Post-roll processing error: {e}", preset_name, "ERROR")
         
-        await asyncio.sleep(3)
+        
+        
+        await asyncio.sleep(2)
+        await asyncio.sleep(1)
         # Always check status (send $tu) after rolling sequence, as requested
         await check_status(client, channel, client.mudae_prefix)
 
@@ -1703,6 +1579,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 return False
             
             has_sphere_perk = "💎/2" in (embed.description or "")
+            desc_text = embed.description or ""
             if is_snipe:
                 target_list = client.kakera_emojis
             elif has_sphere_perk:
@@ -1745,16 +1622,18 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 # Spheres and KakeraP get max priority (999) as they are usually free/special.
                 prio_map = {
                     'kakeraP': 999,
-                    'kakeraC': 100,
-                    'kakeraL': 90,
-                    'kakeraW': 80,
-                    'kakeraR': 70,
-                    'kakeraO': 60,
-                    'kakeraD': 50,
-                    'kakeraY': 40,
-                    'kakeraG': 35,
-                    'kakeraT': 30,
-                    'kakera': 20
+                    'TheKuru': 100,
+                    'PekoHeadBang': 93,
+                    'SmugRin': 90,
+                    'PogCamp~1': 92,
+                    'PogCamp': 91,
+                    'Pats': 60,
+                    'ivehiredthiscastoricetostareatu': 50,
+                    'AnyaHehe': 40,
+                    'HappyDoggo~1': 35,
+                    'PainPeko': 30,
+                    'MageWeird~1': 20,
+                    'MageWeird': 20
                 }
                 # Ensure Spheres are top priority
                 for s in client.sphere_emojis: prio_map[s] = 999
@@ -1776,8 +1655,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         cost = 0
                     else:
                         base_cost = client.dk_consumption
-                        desc_text = embed.description or ""
-                        has_sphere_perk = "💎/2" in desc_text
                         
                         calc_cost = base_cost
                         if chaos_count > 0:
@@ -1800,18 +1677,38 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     # For example, if user sets kakeraY: 80, we only click if current power >= 80%
                     if cost > 0 and hasattr(client, 'kakera_power_thresholds') and client.kakera_power_thresholds:
                         base_name = name.rstrip('2')
-                        
-                        # Determine specific prefix for chaos
-                        prefix = "chaos_" if chaos_count > 0 else ""
-                        specific_name = f"{prefix}{base_name}" if prefix else base_name
-                        
-                        # Check specific first (e.g. chaos_kakeraY), then fallback to base (e.g. kakeraY), then raw name
+                    
+                        # Build prefix list
+                        prefixes = []
+                        if chaos_count > 0:
+                            prefixes.append("chaos")
+                        if has_sphere_perk:
+                            prefixes.append("sphere")
+                    
+                        prefix = "_".join(prefixes)
+                        specific_name = f"{prefix}_{base_name}" if prefix else base_name
+                    
+                        # Check specific first, then fallback
                         threshold = client.kakera_power_thresholds.get(specific_name)
+                    
+                        if threshold is None and has_sphere_perk:
+                            threshold = client.kakera_power_thresholds.get(f"sphere_{base_name}")
+                    
+                        if threshold is None and chaos_count > 0:
+                            threshold = client.kakera_power_thresholds.get(f"chaos_{base_name}")
+                    
                         if threshold is None:
-                            threshold = client.kakera_power_thresholds.get(base_name) or client.kakera_power_thresholds.get(name)
-                            
+                            threshold = (
+                                client.kakera_power_thresholds.get(base_name) or
+                                client.kakera_power_thresholds.get(name)
+                            )
+                    
                         if threshold is not None and current_pow < threshold:
-                            log_function(f"[{client.muda_name}] Power ({current_pow}%) below threshold ({threshold}%) for {specific_name}. Waiting for better kakera.", client.preset_name, "INFO")
+                            log_function(
+                                f"[{client.muda_name}] Power ({current_pow}%) below threshold ({threshold}%) for {specific_name}. Waiting for better kakera.",
+                                client.preset_name,
+                                "INFO"
+                            )
                             continue
 
                     try:
@@ -2143,8 +2040,8 @@ def bot_lifecycle_wrapper(preset_name, preset_data):
                 preset_data.get("auto_us_limit", 0),
                 preset_data.get("auto_us_stop_on_claim", True),
                 preset_data.get("kakera_power_thresholds", {}),
-                preset_data.get("debug_mode", False),
-                preset_data.get("auto_mk_enabled", True)
+                preset_data.get("dk_activation_percent", 15),
+                preset_data.get("debug_mode", False)
             )
         except Exception as e:
             print_log(f"Instance crashed: {e}", preset_name, "ERROR")
@@ -2193,8 +2090,6 @@ def parse_args():
     return parser.parse_args()
 
 if __name__ == "__main__":
-    cleanup_after_update()
-    check_for_updates()
     args = parse_args()
     
     if args.preset:
