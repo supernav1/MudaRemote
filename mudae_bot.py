@@ -1622,18 +1622,15 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 # Spheres and KakeraP get max priority (999) as they are usually free/special.
                 prio_map = {
                     'kakeraP': 999,
-                    'TheKuru': 100,
-                    'PekoHeadBang': 93,
-                    'SmugRin': 90,
-                    'PogCamp~1': 92,
-                    'PogCamp': 91,
-                    'Pats': 60,
-                    'ivehiredthiscastoricetostareatu': 50,
-                    'AnyaHehe': 40,
-                    'HappyDoggo~1': 35,
-                    'PainPeko': 30,
-                    'MageWeird~1': 20,
-                    'MageWeird': 20
+                    'kakeraC': 100,
+                    'kakeraL': 93,
+                    'kakeraW': 90,
+                    'kakeraR': 92,
+                    'kakeraO': 91,
+                    'kakeraD': 60,
+                    'kakeraY': 50,
+                    'kakeraG': 40,
+                    'kakeraT': 35
                 }
                 # Ensure Spheres are top priority
                 for s in client.sphere_emojis: prio_map[s] = 999
@@ -1644,14 +1641,17 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 # Iterate through sorted buttons
                 for btn in all_raw_buttons:
                     name = btn.emoji.name
+                    base_name = name.rstrip('2') if name else ""
+                    
+                    is_green = hasattr(btn, "style") and btn.style == 3
                     
                     # If this kakera is perfectly normal (no chaos, no perks) and we are on cooldown, skip it.
                     # Otherwise, rely on get_current_dk_power() < cost to block it.
-                    if cooldown_active and name != 'kakeraP' and name not in client.sphere_emojis and chaos_count == 0 and not has_sphere_perk:
+                    if cooldown_active and not is_green and base_name != 'kakeraP' and base_name not in client.sphere_emojis and chaos_count == 0 and not has_sphere_perk:
                         continue
 
                     # Exempt KakeraP and Spheres from power consumption logic
-                    if name == 'kakeraP' or name in client.sphere_emojis:
+                    if is_green or base_name == 'kakeraP' or base_name in client.sphere_emojis:
                         cost = 0
                     else:
                         base_cost = client.dk_consumption
