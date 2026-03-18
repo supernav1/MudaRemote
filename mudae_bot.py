@@ -1858,6 +1858,19 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await check_status(client, message.channel, client.mudae_prefix)
                 return
 
+
+        # Handle Command Maintenance
+        if client.rolling_enabled and client.is_actively_rolling:
+            desc = embed.description or ""
+            if "Command under maintenance" in desc:
+                client.interrupt_rolling = True
+                client.key_limit_hit = True
+                log_function(f"[{client.muda_name}] Maintenance detected. Pausing for 5 minutes.", preset_name, "ERROR")
+                # Wait 5 minutes + human jitter
+                await asyncio.sleep(300 + random.randint(0, 30))
+                await check_status(client, message.channel, client.mudae_prefix)
+                return
+        
         process = True
         
         # Self-snipe (Reactive)
