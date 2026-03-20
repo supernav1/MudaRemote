@@ -6,7 +6,6 @@ This fork is just for my own personal use with my own modifications. All credit 
             "chaos_kakeraY": 50,
             "sphere_kakeraY: 25,
             "chaos_sphere_kakeraY": 0
-- Fix kakeraP not being clicked when you don't have enough react power. 
 - Added lazy workaround for issue where $dk was not resetting power until next $tu - for now, upon $dk, power is reset to 100%
 - Added megasphere support
 
@@ -21,4 +20,4 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Allow kakera priority to be set from presets.json ("kakera_priority" - no numbers required, just make sure they're in the desired order)
 
 **21/03/2026:**
-- Fix discounted kakera not being clicked when you don't have enough kakera for a normal reaction at the start of a roll session
+- Fix free (kakeraP) & discounted (chaos, sphere) kakera not being clicked when you don't have enough kakera for a normal reaction at the start of a roll session
