@@ -18,3 +18,4 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **20/03/2026:**
 - Add starwish emoji support (starwish_emojis in preset)
+- Allow kakera priority to be set from presets.json ("kakera_priority" - no numbers required, just make sure they're in the desired order)
