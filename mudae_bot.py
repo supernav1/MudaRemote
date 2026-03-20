@@ -64,6 +64,9 @@ CHAOS_KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'k
 # Sphere Emojis (Do not consume power)
 SPHERE_EMOJIS = ['spP', 'spB', 'spT', 'spG', 'spY', 'spO', 'spR', 'spW', 'spL', 'spD', 'spP2', 'spB2', 'spT2', 'spG2', 'spY2', 'spO2', 'spR2', 'spW2', 'spL2', 'spD2', 'spU', 'spM']
 
+# Starwish Kakera
+STARWISH_EMOJIS: ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
+
 
 def color_log(message, preset_name, log_type="INFO"):
     color_code = COLORS.get(log_type.upper(), COLORS["INFO"])
@@ -190,7 +193,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             dk_power_management, skip_initial_commands, use_slash_rolls, only_chaos,
             reactive_snipe_delay, time_rolls_to_claim_reset_preset,
             rt_ignore_min_kakera_for_wishlist_preset,
-            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset,
+            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset, starwish_emojis_preset,
             rt_only_self_rolls_preset, reactive_kakera_delay_range_preset,
             claim_interval_preset, roll_interval_preset, avoid_list,
             inactive_hours_preset,
@@ -249,6 +252,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.humanization_window_minutes = humanization_window_minutes
     client.inactive_hours = inactive_hours_preset if inactive_hours_preset else []
     client.humanization_inactivity_seconds = humanization_inactivity_seconds
+    client.maintenance_until = None
     
     # Power and key settings
     client.dk_power_management = dk_power_management
@@ -318,6 +322,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.chaos_emojis = chaos_emojis_preset if chaos_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.sphere_perk_emojis = sphere_perk_emojis_preset if sphere_perk_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.sphere_emojis = SPHERE_EMOJIS
+    client.starwish_emojis = starwish_emojis_preset if starwish_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.kakera_power_thresholds = kakera_power_thresholds or {}
     client.debug_mode = debug_mode
 
@@ -1380,7 +1385,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 dbg_owner = get_character_owner(embed) or "unclaimed"
                 log_function(f"[{client.muda_name}] [DEBUG] Roll: {dbg_name} | {dbg_series} | {dbg_kv} ka | {dbg_owner}", preset_name, "INFO")
             
-            all_kakera_emojis = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis
+            all_kakera_emojis = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis + client.starwish_emojis
             is_kakera = False
             if msg.components:
                 for c in msg.components:
@@ -1577,13 +1582,16 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             chaos_count = count_chaos_keys(embed)
             if not is_snipe and client.only_chaos and chaos_count == 0:
                 return False
-            
+
+            has_starwish = "1163913219782492220" in (embed.description or "")
             has_sphere_perk = "💎/2" in (embed.description or "")
             desc_text = embed.description or ""
             if is_snipe:
                 target_list = client.kakera_emojis
             elif has_sphere_perk:
                 target_list = client.sphere_perk_emojis
+            elif has_starwish:
+                target_list = client.starwish_emojis
             elif chaos_count > 0:
                 target_list = client.chaos_emojis
             else:
@@ -1594,7 +1602,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             clicked = False
             
             # Check for KakeraP or Spheres (always safe)
-            has_p_or_sphere = msg.components and any(hasattr(b.emoji, 'name') and (b.emoji.name == 'kakeraP' or b.emoji.name in client.sphere_emojis) for c in msg.components for b in c.children)
+            has_p_or_sphere = msg.components and any(hasattr(b.emoji, 'name') and (b.emoji.name == 'PeepoClown' or b.emoji.name in client.sphere_emojis) for c in msg.components for b in c.children)
             
             # Only abort early if cooldown is active AND there are no potential discounts/spheres
             if cooldown_active and not has_p_or_sphere and chaos_count == 0 and not has_sphere_perk:
@@ -1618,7 +1626,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                              if emoji_name in target_list or emoji_name.rstrip('2') in target_list:
                                  all_raw_buttons.append(btn)
 
-                # Priority Map (User Request: C > L > W > R > O > D > Y > G > T > kakera)
+                # Priority Map
                 # Spheres and KakeraP get max priority (999) as they are usually free/special.
                 prio_map = {
                     'kakeraP': 999,
@@ -1647,11 +1655,11 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     
                     # If this kakera is perfectly normal (no chaos, no perks) and we are on cooldown, skip it.
                     # Otherwise, rely on get_current_dk_power() < cost to block it.
-                    if cooldown_active and not is_green and base_name != 'kakeraP' and base_name not in client.sphere_emojis and chaos_count == 0 and not has_sphere_perk:
+                    if cooldown_active and not is_green and base_name != 'PeepoClown' and base_name not in client.sphere_emojis and chaos_count == 0 and not has_sphere_perk and base_name not in client.starwish_emojis:
                         continue
 
                     # Exempt KakeraP and Spheres from power consumption logic
-                    if is_green or base_name == 'kakeraP' or base_name in client.sphere_emojis:
+                    if is_green or base_name == 'PeepoClown' or base_name in client.sphere_emojis:
                         cost = 0
                     else:
                         base_cost = client.dk_consumption
@@ -1820,7 +1828,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             # Logic for sniping loose kakera if enabled
             if client.kakera_reaction_snipe_mode_active and message.id not in client.kakera_reaction_sniped_messages:
                  # Verify it's actually a drop via buttons
-                all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis
+                all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis + client.starwish_emojis
                 has_btn = False
                 if message.components:
                     for c in message.components:
@@ -1858,7 +1866,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await check_status(client, message.channel, client.mudae_prefix)
                 return
 
-
         # Handle Command Maintenance
         if client.rolling_enabled and client.is_actively_rolling:
             desc = embed.description or ""
@@ -1870,7 +1877,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await asyncio.sleep(300 + random.randint(0, 30))
                 await check_status(client, message.channel, client.mudae_prefix)
                 return
-        
+
         process = True
         
         # Self-snipe (Reactive)
@@ -1905,7 +1912,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             
             # External Kakera Snipe on Character Rolls
             if client.kakera_reaction_snipe_mode_active and message.id not in client.kakera_reaction_sniped_messages and process:
-                 all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis
+                 all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis + client.starwish_emojis
                  has_btn = False
                  if message.components:
                     for c in message.components:
@@ -1984,7 +1991,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         # Reactive Kakera on own rolls (with humanized delay)
         if client.rolling_enabled and client.enable_reactive_self_snipe and client.is_actively_rolling and process:
             # Check if kakera button exists and value is high enough
-            all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis
+            all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis + client.starwish_emojis
             has_btn = False
             if message.components:
                 for c in message.components:
@@ -2043,6 +2050,7 @@ def bot_lifecycle_wrapper(preset_name, preset_data):
                 preset_data.get("kakera_emojis", None),
                 preset_data.get("chaos_emojis", None),
                 preset_data.get("sphere_perk_emojis", None),
+                preset_data.get("starwish_emojis", None),
                 preset_data.get("rt_only_self_rolls", False),
                 preset_data.get("reactive_kakera_delay_range", [0.3, 1.0]),
                 preset_data.get("claim_interval", 180),
