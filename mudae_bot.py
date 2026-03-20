@@ -1663,7 +1663,22 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     
                     # If this kakera is perfectly normal (no chaos, no perks) and we are on cooldown, skip it.
                     # Otherwise, rely on get_current_dk_power() < cost to block it.
-                    if cooldown_active and not is_green and base_name != 'kakeraP' and base_name not in client.sphere_emojis and chaos_count == 0 and not has_sphere_perk and base_name not in client.starwish_emojis:
+                    # FIRST: determine cost
+                    if is_green or base_name == 'kakeraP' or base_name in client.sphere_emojis:
+                        cost = 0
+                    else:
+                        base_cost = client.dk_consumption
+                        calc_cost = base_cost
+                        if chaos_count > 0:
+                            calc_cost = int(calc_cost / 2)
+                        if has_sphere_perk:
+                            calc_cost = int(calc_cost / 2)
+                        cost = calc_cost
+                    
+                    # THEN: apply cooldown logic
+                    current_pow = get_current_dk_power()
+                    
+                    if cooldown_active and current_pow < cost:
                         continue
 
                     # Exempt KakeraP and Spheres from power consumption logic
