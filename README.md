@@ -1,3 +1,20 @@
-This fork is just for my own personal use with my own modifications.
+This fork is just for my own personal use with my own modifications. All credit for original work goes to misutesu-desu, and my additions may or may not work.
 
-All credit for original work goes to misutesu.
+**15/03/2026:**
+- Add customisable dk threshold (dk_activation_percent in preset) - falls back to 15
+- Add sphere perk emoji threshold support: e.g.:
+            "chaos_kakeraY": 50,
+            "sphere_kakeraY: 25,
+            "chaos_sphere_kakeraY": 0
+- Fix kakeraP not being clicked when you don't have enough react power. 
+- Added lazy workaround for issue where $dk was not resetting power until next $tu - for now, upon $dk, power is reset to 100%
+- Added megasphere support
+
+**17/03/2026:**
+- Tentative fix to click green button kakera (still haven't been able to test if this works)
+
+**18/03/2026:**
+- Add pause when slash command maintenance is detected (Command under maintenance! (For 3 minutes, reboot))
+
+**18/03/2026:**
+- Add starwish emoji support (starwish_emojis in preset)
