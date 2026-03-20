@@ -20,5 +20,5 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Add starwish emoji support (starwish_emojis in preset)
 - Allow kakera priority to be set from presets.json ("kakera_priority" - no numbers required, just make sure they're in the desired order)
 
-**20/03/2026:**
+**21/03/2026:**
 - Fix discounted kakera not being clicked when you don't have enough kakera for a normal reaction at the start of a roll session
