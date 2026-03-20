@@ -198,7 +198,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             claim_interval_preset, roll_interval_preset, avoid_list,
             inactive_hours_preset,
             auto_us_enabled, auto_us_limit, auto_us_stop_on_claim,
-            kakera_power_thresholds, dk_activation_percent, debug_mode):
+            kakera_power_thresholds, dk_activation_percent, kakera_priority, debug_mode):
 
     client = commands.Bot(command_prefix=prefix, chunk_guilds_at_startup=False, self_bot=True)
 
@@ -282,7 +282,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.last_successfully_claimed_character = None # Prevent redundant RT on same name
     client._has_initialized = False # Tracks whether on_ready setup has already run (prevents duplicate $tu on reconnect)
 
-
     # Slash command internal state
     client.use_slash_rolls = bool(use_slash_rolls and Route is not None)
     client.mudae_slash_cache = {}
@@ -324,6 +323,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.sphere_emojis = SPHERE_EMOJIS
     client.starwish_emojis = starwish_emojis_preset if starwish_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.kakera_power_thresholds = kakera_power_thresholds or {}
+    client.kakera_priority = kakera_priority
     client.debug_mode = debug_mode
 
 
@@ -1601,7 +1601,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             cooldown_active = not is_kakera_reaction_allowed()
             clicked = False
             
-            # Check for kakeraP or Spheres (always safe)
+            # Check for KakeraP or Spheres (always safe)
             has_p_or_sphere = msg.components and any(hasattr(b.emoji, 'name') and (b.emoji.name == 'kakeraP' or b.emoji.name in client.sphere_emojis) for c in msg.components for b in c.children)
             
             # Only abort early if cooldown is active AND there are no potential discounts/spheres
@@ -1626,25 +1626,33 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                              if emoji_name in target_list or emoji_name.rstrip('2') in target_list:
                                  all_raw_buttons.append(btn)
 
-                # Priority Map
-                # Spheres and kakeraP get max priority (999) as they are usually free/special.
-                prio_map = {
-                    'kakeraP': 999,
-                    'kakeraC': 100,
-                    'kakeraL': 93,
-                    'kakeraW': 90,
-                    'kakeraR': 92,
-                    'kakeraO': 91,
-                    'kakeraD': 60,
-                    'kakeraY': 50,
-                    'kakeraG': 40,
-                    'kakeraT': 35
-                }
-                # Ensure Spheres are top priority
-                for s in client.sphere_emojis: prio_map[s] = 999
+                # Priority Map (User Request: C > L > W > R > O > D > Y > G > T > kakera)
+                # Spheres and KakeraP get max priority (999) as they are usually free/special.
+                prio_map = {}
+                
+                # Load ordered list from presets
+                priority_list = getattr(client, "kakera_priority", [])
+                
+                # Assign descending priority values
+                max_priority = len(priority_list)
+                for i, name in enumerate(priority_list):
+                    prio_map[name] = max_priority - i
+                
+                # Always max priority
+                prio_map['kakeraP'] = 999
+                
+                # Spheres always highest
+                for s in client.sphere_emojis:
+                    prio_map[s] = 999
                 
                 # Sort descending by priority value
-                all_raw_buttons.sort(key=lambda b: prio_map.get(b.emoji.name.rstrip('2') if hasattr(b.emoji, 'name') and b.emoji.name else "", 0), reverse=True)
+                all_raw_buttons.sort(
+                    key=lambda b: prio_map.get(
+                        b.emoji.name.rstrip('2') if hasattr(b.emoji, 'name') and b.emoji.name else "",
+                        0
+                    ),
+                    reverse=True
+                )
 
                 # Iterate through sorted buttons
                 for btn in all_raw_buttons:
@@ -2062,6 +2070,7 @@ def bot_lifecycle_wrapper(preset_name, preset_data):
                 preset_data.get("auto_us_stop_on_claim", True),
                 preset_data.get("kakera_power_thresholds", {}),
                 preset_data.get("dk_activation_percent", 15),
+                preset_data.get("kakera_priority", []),
                 preset_data.get("debug_mode", False)
             )
         except Exception as e:
