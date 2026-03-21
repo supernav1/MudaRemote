@@ -760,6 +760,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 # Immediately update local power state
                 client.current_dk_power = 100
                 client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
+
+                current_pow = get_current_dk_power()
                 
                 client.dk_stock_count = max(0, client.dk_stock_count - 1)
         
