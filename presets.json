@@ -1,18 +1,18 @@
 {
-    "Main": {
-        "token": "TOKeN",
+    "Main_Account": {
+        "token": "TOKEN",
+        "channel_id": 12345678987654321,
         "prefix": "/////////////////////",
         "mudae_prefix": "$",
-        "channel_id": 12345,
         "roll_command": "/wa",
         "min_kakera": 200,
         "delay_seconds": 10.0,
         "start_delay": 3,
-        "roll_speed": 2.5,
+        "roll_speed": 2.6,
         "snipe_delay": 10.0,
         "series_snipe_delay": 10.0,
         "kakera_snipe_threshold": 250,
-        "kakera_reaction_snipe_delay": 10.0,
+        "kakera_reaction_snipe_delay": 2,
         "humanization_window_minutes": 15,
         "humanization_inactivity_seconds": 120,
         "reactive_snipe_delay": 1.0,
@@ -22,7 +22,7 @@
         "snipe_ignore_min_kakera_reset": false,
         "series_snipe_mode": false,
         "kakera_snipe_mode": true,
-        "kakera_reaction_snipe_mode": false,
+        "kakera_reaction_snipe_mode": true,
         "reactive_snipe_on_own_rolls": true,
         "key_mode": true,
         "only_chaos": false,
@@ -39,52 +39,51 @@
         "debug_mode": false,
         "wishlist": [
             "Hatsune Miku",
-            "Megumin",
             "Saber"
         ],
-        "series_wishlist": [],
-        "avoid_list": [],
-        "kakera_reaction_snipe_targets": [],
+        "series_wishlist": [
+            "Example series",
+            "Example series 2"
+        ],
+        "avoid_list": [
+            "Example character",
+            "Example character 2"
+        ],
+        "kakera_reaction_snipe_targets": [
+            "Exampleuser1",
+            "Exampleuser2"
+        ],
         "kakera_emojis": [
-            "kakeraC",
-            "kakeraD",
-            "kakeraR",
-            "kakeraW",
-            "kakeraP",
-            "kakeraL",
-            "kakeraY"
+            "kakeraP"
         ],
         "chaos_emojis": [
-            "kakeraC",
-            "kakeraD",
-            "kakeraR",
-            "kakeraW",
-            "kakeraP",
-            "kakeraL",
-            "kakeraY"
+            "kakeraP"
         ],
-        "sphere_perk_emojis": [
-            "kakeraC",
-            "kakeraD",
-            "kakeraR",
-            "kakeraW",
+        "starwish_emojis": [
             "kakeraP",
+            "kakeraC",
+            "kakeraR",
             "kakeraL",
+            "kakeraW",
+            "kakeraO",
             "kakeraY"
-        ],
-        "inactive_hours": [
-            [
-                2,
-                7
-            ]
         ],
         "reactive_kakera_delay_range": [
             0.5,
             2.0
         ],
+         "kakera_priority": [
+            "kakeraP",
+            "kakeraC",
+            "kakeraW",
+            "kakeraR",
+            "kakeraL",
+            "kakeraO",
+            "kakeraY"
+        ],       
         "kakera_power_thresholds": {
-            "chaos_kakeraY": 50,
-            "chaos_sphere_kakeraY": 0
+            "chaos_kakeraO": 50,
+            "chaos_sphere_kakeraO": 0
         }
     }
 }
