@@ -21,3 +21,6 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **21/03/2026:**
 - Fix free (kakeraP) & discounted (chaos, sphere) kakera not being clicked when you don't have enough kakera for a normal reaction at the start of a roll session
+
+**28/03/2026:**
+- Added automatic $daily and $pokeslot support (only works when rolling is enabled)
