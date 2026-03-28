@@ -901,7 +901,20 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         if client.dk_power_management and client.rolling_enabled:
             await handle_dk_power_management(client, channel, tu_message_content)
+            
+        # Automatic $daily and $p 
+        if client.rolling_enabled:
+            # Check if $daily is available and send if so
+            if "$daily is available" in c_lower:
+                log_function(f"[{client.muda_name}] $daily is available! Sending command...", preset_name, "INFO")
+                await channel.send(f"{client.mudae_prefix}daily")
+                await asyncio.sleep(2.0)
 
+            if "$p is available" in c_lower:
+                log_function(f"[{client.muda_name}] $p is available! Sending command...", preset_name, "INFO")
+                await channel.send(f"{client.mudae_prefix}p")
+                await asyncio.sleep(2.0)     
+        
         # Always parse Kakera Power from $tu to update local state (Scanning for Power: XX%)
         try:
             power_match = re.search(r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}", c_lower)
