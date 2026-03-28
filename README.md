@@ -1,4 +1,4 @@
-This fork is just for my own personal use with my own modifications. All credit for original work goes to misutesu-desu, and my additions may or may not work.
+This fork is just for my own personal use with my own modifications. All credit for original work goes to misutesu-desu, and my additions may or may not work. Additions only support English at this time.
 
 **15/03/2026:**
 - Add customisable dk threshold (dk_activation_percent in preset) - falls back to 15
