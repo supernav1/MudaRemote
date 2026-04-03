@@ -431,17 +431,18 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
     def get_current_dk_power() -> int:
         power = client.current_dk_power
+    
         if not hasattr(client, 'last_dk_power_update_utc'):
             return power
+    
         now = datetime.datetime.now(datetime.timezone.utc)
         elapsed = (now - client.last_dk_power_update_utc).total_seconds()
-        regenerated = int(elapsed / 180) # 1% every 3 minutes
+        regenerated = int(elapsed / 180)  # 1% every 3 minutes
+    
         if regenerated > 0:
-            power = min(100, power + regenerated)
-            client.current_dk_power = power
-            client.last_dk_power_update_utc += datetime.timedelta(minutes=3 * regenerated)
+            power = power + regenerated
+    
         return power
-
 
     def _refresh_session_id():
         try:
@@ -758,7 +759,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await asyncio.sleep(1.5)
             
                 # Immediately update local power state
-                client.current_dk_power = 100
+                client.current_dk_power = max(client.current_dk_power, 100)
                 client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
 
                 current_pow = get_current_dk_power()
@@ -901,7 +902,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         if client.dk_power_management and client.rolling_enabled:
             await handle_dk_power_management(client, channel, tu_message_content)
-            
+
         # Automatic $daily and $p 
         if client.rolling_enabled:
             # Check if $daily is available and send if so
@@ -914,7 +915,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 log_function(f"[{client.muda_name}] $p is available! Sending command...", preset_name, "INFO")
                 await channel.send(f"{client.mudae_prefix}p")
                 await asyncio.sleep(2.0)     
-        
+
         # Always parse Kakera Power from $tu to update local state (Scanning for Power: XX%)
         try:
             power_match = re.search(r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}", c_lower)
@@ -1760,8 +1761,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     try:
                         await btn.click()
                         # Debit power locally to prevent immediate subsequent spam
-                        client.current_dk_power = max(0, get_current_dk_power() - cost)
-                        client.kakera_reacted_messages.add(msg.id)
+                        if cost > 0:
+                            client.current_dk_power = max(0, client.current_dk_power - cost)
+                            client.kakera_reacted_messages.add(msg.id)
                         
                         log_function(f"[{client.muda_name}] Kakera clicked: {char_name} (Pw: {client.current_dk_power}%)", client.preset_name, "KAKERA")
                         clicked = True
@@ -1904,17 +1906,18 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await check_status(client, message.channel, client.mudae_prefix)
                 return
 
-        # Handle Command Maintenance
-        if client.rolling_enabled and client.is_actively_rolling:
-            desc = embed.description or ""
-            if "Command under maintenance" in desc:
-                client.interrupt_rolling = True
-                client.key_limit_hit = True
-                log_function(f"[{client.muda_name}] Maintenance detected. Pausing for 5 minutes.", preset_name, "ERROR")
-                # Wait 5 minutes + human jitter
-                await asyncio.sleep(300 + random.randint(0, 30))
-                await check_status(client, message.channel, client.mudae_prefix)
-                return
+        # Handle Command Maintenance 
+        desc = embed.description or ""
+        if "Command under maintenance" in desc.lower():
+            log_function(
+                f"[{client.muda_name}] Maintenance detected. Pausing for 5 minutes.",
+                preset_name,
+                "ERROR"
+            )
+
+            await asyncio.sleep(180 + random.randint(0, 30))
+            await check_status(client, message.channel, client.mudae_prefix)
+            return
 
         process = True
         
