@@ -28,4 +28,4 @@ This fork is just for my own personal use with my own modifications. All credit 
 **03/04/2026:**
 - Refactor to fix issue when rolling for >3mins where power value would reset to 100%
 - Improve Mudae command maintenance handling (theoretically should now also work when sending $tu) - untested as of yet
-- Add variable rolling speed support (i.e. [2.5, 3.5] in preset) 
+- Add variable rolling speed support (i.e. [2.5, 3.5] in preset) - NOTE: this likely breaks the timing rolls before reset feature.
