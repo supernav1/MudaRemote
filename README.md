@@ -24,3 +24,7 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **28/03/2026:**
 - Added automatic $daily and $pokeslot support (only works when rolling is enabled)
+
+**03/04/2026:**
+- Refactor to fix issue when rolling for >3mins where power value would reset to 100%
+- Improve Mudae command maintenance handling (theoretically should now also work when sending $tu) - untested as of yet
