@@ -1731,6 +1731,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                             prefixes.append("chaos")
                         if has_sphere_perk:
                             prefixes.append("sphere")
+                        if has_starwish:
+                            prefixes.append("sw")
                     
                         prefix = "_".join(prefixes)
                         specific_name = f"{prefix}_{base_name}" if prefix else base_name
@@ -1740,7 +1742,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     
                         if threshold is None and has_sphere_perk:
                             threshold = client.kakera_power_thresholds.get(f"sphere_{base_name}")
-                    
+
+                        if threshold is None and has_starwish:
+                            threshold = client.kakera_power_thresholds.get(f"sw_{base_name}")
+
                         if threshold is None and chaos_count > 0:
                             threshold = client.kakera_power_thresholds.get(f"chaos_{base_name}")
                     
