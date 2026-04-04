@@ -31,7 +31,8 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Add variable rolling speed support (i.e. [2.5, 3.5] in preset) - NOTE: this likely breaks the timing rolls before reset feature.
 
 **05/04/2026:**
-- - Add starwish support for kakera thresholds: e.g.:
+- Add starwish support for kakera thresholds (perk 8): e.g.:
             "chaos_kakeraY": 75,
             "chaos_sphere_kakeraY": 0,
-            "chaos_sphere_sw_kakeraY": 0
+            "chaos_sphere_sw_kakeraY": 0,
+            "chaos_sw_kakeraY": 0
