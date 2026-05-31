@@ -222,7 +222,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.muda_name = BOT_NAME
     client.claim_right_available = False
     client.target_channel_id = target_channel_id
-    client.roll_speed = roll_speed
     client.mudae_prefix = mudae_prefix
     client.key_mode = key_mode
     client.delay_seconds = delay_seconds
@@ -289,13 +288,26 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.mudae_session_id = None
     client.slash_fail_streak = 0
     client.slash_fail_threshold = 3
-    client.slash_min_interval = max(1.0, float(roll_speed)) if roll_speed else 1.0
     client.slash_max_backoff = 6.0
     client.last_slash_attempt = 0.0
     client.slash_rate_limited_until = 0.0
     client.key_limit_hit = False
     client.time_rolls_to_claim_reset = time_rolls_to_claim_reset_preset
     client.rt_ignore_min_kakera_for_wishlist = rt_ignore_min_kakera_for_wishlist_preset
+
+    # Variable Roll Speed
+    if isinstance(roll_speed, list):
+        client.roll_speed_min = float(roll_speed[0])
+        client.roll_speed_max = float(roll_speed[1])
+    else:
+        client.roll_speed_min = float(roll_speed)
+        client.roll_speed_max = float(roll_speed)    
+
+    # Slash Rolls Min Interval
+    if isinstance(roll_speed, list):
+        client.slash_min_interval = max(1.0, float(roll_speed[0]))
+    else:
+        client.slash_min_interval = max(1.0, float(roll_speed)) if roll_speed else 1.0
     
     # RT Self-Roll Only Mode: Prevents RT usage on external snipes
     client.rt_only_self_rolls = rt_only_self_rolls_preset
@@ -326,6 +338,12 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.kakera_priority = kakera_priority
     client.debug_mode = debug_mode
 
+    def get_roll_delay(client):
+        """Return a random delay between roll_speed_min and roll_speed_max."""
+        delay = random.uniform(client.roll_speed_min, client.roll_speed_max)
+        if client.use_slash_rolls:
+            delay = max(delay, 0.2)
+        return delay
 
     async def health_monitor_task():
         # Reconnect if gateway drops
@@ -721,53 +739,90 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         content_lower = tu_content.lower()
         
         # Check stock
-        dk_stock_match = re.search(r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[ií]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)", content_lower)
+        dk_stock_match = re.search(
+            r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[ií]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)",
+            content_lower
+        )
+    
         if dk_stock_match:
             client.dk_stock_count = int(dk_stock_match.group(1))
-            log_function(f"[{client.muda_name}] DK Stock: {client.dk_stock_count}", preset_name, "INFO")
-        elif re.search(r"\$dk.*?(?:ready|pronto|disponible|prêt|dispon[ií]vel|listo)", content_lower):
-            # Fallback for cases where it says "ready" without a stock number on the same line
+            log_function(
+                f"[{client.muda_name}] DK Stock: {client.dk_stock_count}",
+                preset_name,
+                "INFO"
+            )
+    
+        elif re.search(
+            r"\$dk.*?(?:ready|pronto|disponible|prêt|dispon[ií]vel|listo)",
+            content_lower
+        ):
             client.dk_stock_count = 1
-            log_function(f"[{client.muda_name}] DK Stock: 1 (Derived)", preset_name, "INFO")
+            log_function(
+                f"[{client.muda_name}] DK Stock: 1 (Derived)",
+                preset_name,
+                "INFO"
+            )
+    
         else:
             client.dk_stock_count = 0
-        
+    
         if client.dk_stock_count == 0:
             return
-        
+    
         try:
-            power_match = re.search(r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}", content_lower)
-            
-            # Handling PT-BR translation variance: "reação" vs "botão", Spanish/French: "botón"/"bouton"
-            consumption_match = re.search(r"(?:each kakera (?:reaction|button) consumes|cada (?:reação|botão|botón) de kakera consume|chaque bouton kakera consomme)\s*(\d+)%", content_lower)
-            
+            power_match = re.search(
+                r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}",
+                content_lower
+            )
+    
             if not power_match:
-                log_function(f"[{client.muda_name}] DK: Parse failed (power).", preset_name, "WARN")
+                log_function(
+                    f"[{client.muda_name}] DK: Parse failed (power).",
+                    preset_name,
+                    "WARN"
+                )
                 return
-        
+    
             current_power = int(power_match.group(1))
-        
+    
             # Use item if power is below configured threshold
             if current_power < dk_activation_percent:
+    
                 log_function(
                     f"[{client.muda_name}] DK: Activating. ({current_power}% < {dk_activation_percent}%)",
                     preset_name,
                     "KAKERA"
                 )
-
+    
                 await channel.send(f"{client.mudae_prefix}dk")
                 await asyncio.sleep(1.5)
-            
+    
+                # Prevent stale $tu from immediately overwriting our power
+                client.dk_just_used = True
+    
                 # Immediately update local power state
-                client.current_dk_power = max(client.current_dk_power, 100)
-                client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
-
-                current_pow = get_current_dk_power()
-                
-                client.dk_stock_count = max(0, client.dk_stock_count - 1)
-        
+                client.current_dk_power = 100
+                client.last_dk_power_update_utc = datetime.datetime.now(
+                    datetime.timezone.utc
+                )
+    
+                log_function(
+                    f"[{client.muda_name}] DK: Local power reset to 100%",
+                    preset_name,
+                    "INFO"
+                )
+    
+                client.dk_stock_count = max(
+                    0,
+                    client.dk_stock_count - 1
+                )
+    
         except Exception as e:
-            log_function(f"[{client.muda_name}] DK: Error parsing power: {e}", preset_name, "ERROR")
+            log_function(
+                f"[{client.muda_name}] DK: Error parsing power: {e}",
+                preset_name,
+                "ERROR"
+            )
 
     async def snipe_only_status_loop(client, channel):
         """
@@ -920,9 +975,21 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         try:
             power_match = re.search(r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}", c_lower)
             if power_match:
-                client.current_dk_power = int(power_match.group(1))
-                client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
-                # log_function(f"[{client.muda_name}] Power Synced: {client.current_dk_power}%", preset_name, "INFO")
+
+                if getattr(client, "dk_just_used", False):
+                    client.dk_just_used = False
+
+                    log_function(
+                        f"[{client.muda_name}] Skipped stale power sync after DK use.",
+                        preset_name,
+                        "INFO"
+                    )
+
+                else:
+                    client.current_dk_power = int(power_match.group(1))
+                    client.last_dk_power_update_utc = datetime.datetime.now(
+                        datetime.timezone.utc
+                    )
 
             # Support EN, PT, ES, FR for consumption regex
             consumption_match = re.search(r"(?:each kakera (?:reaction|button) consumes|cada (?:reação|botão|botón) de kakera consume|chaque bouton kakera consomme)\s*(\d+)%", c_lower)
@@ -1231,38 +1298,34 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         log_function(f"[{client.muda_name}] {log_text}", client.preset_name, "INFO")
         
         # Timing Logic: If not ready to claim and timing is enabled, wait until just before claim reset
-        # If reset is soon (<= 60 mins), we time it even if RT/KeyMode is available (per user request)
         reset_soon = False
         if client.next_claim_reset_at_utc:
             diff = (client.next_claim_reset_at_utc - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
             if 0 < diff <= 60 * 60:
                 reset_soon = True
-
+    
         is_timing_mode_active = False
         if client.time_rolls_to_claim_reset and not client.claim_right_available and (reset_soon or (not client.rt_available and not client.key_mode)):
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             if client.next_claim_reset_at_utc and client.next_claim_reset_at_utc > now_utc:
-                actual_speed = max(client.roll_speed, 0.2 if client.use_slash_rolls else 0)
+                # Use the AVERAGE of the range for timing estimation
+                avg_speed = (client.roll_speed_min + client.roll_speed_max) / 2.0
+                actual_speed = max(avg_speed, 0.2 if client.use_slash_rolls else 0)
                 total_duration = rolls_left * actual_speed
                 
-                # Aim for the last roll to finish ~1s AFTER reset.
-                # This way claim happens after reset → we use normal claim (not RT) with fresh claim right.
-                # Formula: start_time = reset + offset - total_duration
-                # offset = 1 second after reset (minimizes new interval roll waste)
                 target_start_time = client.next_claim_reset_at_utc + datetime.timedelta(seconds=1) - datetime.timedelta(seconds=total_duration)
                 
                 wait_seconds = (target_start_time - now_utc).total_seconds()
                 
-                # Safety: Don't wait past roll reset (ensure we finish before roll reset)
                 if client.roll_reset_at_utc:
                     max_wait = (client.roll_reset_at_utc - now_utc).total_seconds() - total_duration - 5
                     wait_seconds = min(wait_seconds, max_wait)
-
+    
                 if wait_seconds > 2:
                     log_function(f"[{client.muda_name}] Timing rolls to finish after reset. Waiting {wait_seconds/60:.1f}m.", preset_name, "RESET")
                     await asyncio.sleep(wait_seconds)
                     is_timing_mode_active = True
-
+    
         start_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=0.5)
         client.is_actively_rolling = True
         client.interrupt_rolling = False
@@ -1272,14 +1335,13 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 break
             try:
                 await send_roll_command(channel, roll_command)
-                await asyncio.sleep(max(client.roll_speed, 0.2 if client.use_slash_rolls else 0))
+                await asyncio.sleep(get_roll_delay(client))
             except Exception:
                 await asyncio.sleep(1)
                 
         client.is_actively_rolling = False
-        await asyncio.sleep(5) # Let messages populate
+        await asyncio.sleep(5)
         
-        # If timing mode was active, claim reset has now happened. Update state for normal claim flow.
         if is_timing_mode_active:
             client.claim_right_available = True
             log_function(f"[{client.muda_name}] Reset passed. Claim is now available.", preset_name, "CLAIM")
@@ -1292,16 +1354,12 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             
             mudae_messages_to_process.reverse()
             if mudae_messages_to_process:
-                 # In timing mode, use normal claim flow (not key_mode_only) since claim is now available
                  await handle_mudae_messages(client, channel, mudae_messages_to_process, ignore_limit_for_post_roll, False if is_timing_mode_active else key_mode_only_kakera_for_post_roll)
         except Exception as e:
             log_function(f"[{client.muda_name}] Post-roll processing error: {e}", preset_name, "ERROR")
         
-        
-        
         await asyncio.sleep(2)
         await asyncio.sleep(1)
-        # Always check status (send $tu) after rolling sequence, as requested
         await check_status(client, channel, client.mudae_prefix)
 
 
