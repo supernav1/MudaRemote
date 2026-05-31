@@ -39,3 +39,6 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **09/04/2026:**
 - Add event candle support (lazy - just added to sphere logic, so it should always click...)
+
+**31/05/2026:**
+- Fix $dk not resetting power to 100% 
