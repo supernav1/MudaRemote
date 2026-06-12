@@ -46,5 +46,4 @@ This fork is just for my own personal use with my own modifications. All credit 
 **12/06/2026:**
 - $dk now activates mid-roll session (rolls should pause for 3 seconds, $dk activates, then rolls resume after 3 additional seconds - this was required to avoid rate limit issues)
 - Maintenance is now actually detected properly
-- Green buttons should now be actually recognised and clicked
 - Added missing sphere button (red)
