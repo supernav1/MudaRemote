@@ -24,7 +24,7 @@ except ImportError:
 
 # Bot Identification
 BOT_NAME = "MudaRemote"
-CURRENT_VERSION = "3.6.4"
+CURRENT_VERSION = "3.7"
 
 # Load config
 presets = {}
@@ -62,7 +62,7 @@ KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP
 CHAOS_KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
 
 # Sphere Emojis (Do not consume power)
-SPHERE_EMOJIS = ['spP', 'spB', 'spT', 'spG', 'spY', 'spO', 'spR', 'spW', 'spL', 'spD', 'spP2', 'spB2', 'spT2', 'spG2', 'spY2', 'spO2', 'spR2', 'spW2', 'spL2', 'spD2', 'spU', 'spM', '🕯️']
+SPHERE_EMOJIS = ['sp', 'spP', 'spB', 'spT', 'spG', 'spY', 'spO', 'spR', 'spW', 'spL', 'spD', 'spP2', 'spB2', 'spT2', 'spG2', 'spY2', 'spO2', 'spR2', 'spW2', 'spL2', 'spD2', 'spU', 'spM', '🕯️']
 
 # Starwish Kakera
 STARWISH_EMOJIS: ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
@@ -105,7 +105,7 @@ def is_free_event(embed):
         return False
     desc = embed.description.lower()
     # "on me, it's free!" is the standard indicator for these event cards.
-    free_keywords = ["it's free!", "é de graça!", "¡es gratis!", "christmas art contest", "new year's contest"]
+    free_keywords = ["it's free!", "Ã© de graÃ§a!", "Â¡es gratis!", "christmas art contest", "new year's contest"]
     return any(k in desc for k in free_keywords)
 
 def has_claim_option(message, embed, claim_emojis):
@@ -147,7 +147,7 @@ def get_character_owner(embed):
     
     footer_text = embed.footer.text
     # Patterns for: English, Portuguese, Spanish, French
-    belongs_pattern = r'(?:[Bb]elongs to|[Pp]ertence a|[Pp]ertenece a|[Aa]ppartient [àa])\s+(.+?)$'
+    belongs_pattern = r'(?:[Bb]elongs to|[Pp]ertence a|[Pp]ertenece a|[Aa]ppartient [Ã a])\s+(.+?)$'
     match = re.search(belongs_pattern, footer_text)
     
     if match:
@@ -257,6 +257,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.dk_power_management = dk_power_management
     client.skip_initial_commands = skip_initial_commands
     client.dk_stock_count = 0 
+    client.dk_activation_percent = dk_activation_percent
     client.only_chaos = only_chaos
 
     # Auto $us Configuration
@@ -462,6 +463,27 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     
         return power
 
+    def get_maintenance_remaining_seconds() -> float:
+        until = getattr(client, "maintenance_until", None)
+        if not until:
+            return 0.0
+
+        remaining = (until - datetime.datetime.now(datetime.timezone.utc)).total_seconds()
+        if remaining <= 0:
+            client.maintenance_until = None
+            return 0.0
+
+        return remaining
+
+    async def wait_for_maintenance_clear():
+        remaining = get_maintenance_remaining_seconds()
+        if remaining <= 0:
+            return False
+
+        await asyncio.sleep(remaining)
+        client.maintenance_until = None
+        return True
+
     def _refresh_session_id():
         try:
             ws = getattr(client, "ws", None)
@@ -616,6 +638,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         return False
 
     async def send_roll_command(channel, command_name):
+        await wait_for_maintenance_clear()
+
         cmd = (command_name or "").strip()
         if not cmd:
             return
@@ -643,6 +667,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         If all slash attempts fail, waits 30 minutes before returning.
         Never falls back to text when slash is enabled.
         """
+        await wait_for_maintenance_clear()
+
         if client.use_slash_rolls:
             max_attempts = 3
             retry_delay = 5.0  # seconds between retries
@@ -740,7 +766,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         
         # Check stock
         dk_stock_match = re.search(
-            r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[ií]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)",
+            r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[iÃ­]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)",
             content_lower
         )
     
@@ -753,7 +779,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             )
     
         elif re.search(
-            r"\$dk.*?(?:ready|pronto|disponible|prêt|dispon[ií]vel|listo)",
+            r"\$dk.*?(?:ready|pronto|disponible|prÃªt|dispon[iÃ­]vel|listo)",
             content_lower
         ):
             client.dk_stock_count = 1
@@ -767,7 +793,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             client.dk_stock_count = 0
     
         if client.dk_stock_count == 0:
-            return
+            return False
     
         try:
             power_match = re.search(
@@ -781,7 +807,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     preset_name,
                     "WARN"
                 )
-                return
+                return False
     
             current_power = int(power_match.group(1))
     
@@ -796,9 +822,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     
                 await channel.send(f"{client.mudae_prefix}dk")
                 await asyncio.sleep(1.5)
-    
-                # Prevent stale $tu from immediately overwriting our power
-                client.dk_just_used = True
     
                 # Immediately update local power state
                 client.current_dk_power = 100
@@ -816,6 +839,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     0,
                     client.dk_stock_count - 1
                 )
+                return True
     
         except Exception as e:
             log_function(
@@ -823,6 +847,42 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 preset_name,
                 "ERROR"
             )
+        return False
+
+    async def maybe_use_dk_mid_roll(client, channel):
+        if not client.dk_power_management:
+            return False
+
+        if client.dk_stock_count <= 0:
+            return False
+
+        current_power = get_current_dk_power()
+        activation_percent = getattr(client, "dk_activation_percent", dk_activation_percent)
+
+        if current_power >= activation_percent:
+            return False
+
+        log_function(
+            f"[{client.muda_name}] DK: Mid-roll activation. Pausing before $dk. ({current_power}% < {activation_percent}%)",
+            preset_name,
+            "KAKERA"
+        )
+
+        await asyncio.sleep(3)
+        await channel.send(f"{client.mudae_prefix}dk")
+        await asyncio.sleep(3)
+
+        client.current_dk_power = 100
+        client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
+        client.dk_stock_count = max(0, client.dk_stock_count - 1)
+
+        log_function(
+            f"[{client.muda_name}] DK: Local power reset to 100%. Stock left: {client.dk_stock_count}",
+            preset_name,
+            "INFO"
+        )
+
+        return True
 
     async def snipe_only_status_loop(client, channel):
         """
@@ -892,6 +952,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
 
     async def check_status(client, channel, mudae_prefix, proceed_to_rolls: bool = True):
+        await wait_for_maintenance_clear()
+
         log_function(f"[{client.muda_name}] Checking $tu...", client.preset_name, "CHECK")
         tu_message_content = None
 
@@ -925,9 +987,12 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             return response_username == bot_username or response_username == bot_display_name
         
         for _ in range(5):
+            tu_requested_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
             await send_tu_command(channel); await asyncio.sleep(2.5)
             async for msg in channel.history(limit=10):
                 if msg.author.id == TARGET_BOT_ID and msg.content:
+                    if msg.created_at < tu_requested_at:
+                        continue
                     c = msg.content.lower()
                     # Broad check for $tu response characteristics (rolls count, reset timers, or specific keywords)
                     # "rolls" is common across all tested languages (EN, FR, ES, PT)
@@ -955,8 +1020,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         c_lower = tu_message_content.lower()
 
+        dk_used_from_this_tu = False
         if client.dk_power_management and client.rolling_enabled:
-            await handle_dk_power_management(client, channel, tu_message_content)
+            dk_used_from_this_tu = await handle_dk_power_management(client, channel, tu_message_content)
 
         # Automatic $daily and $p 
         if client.rolling_enabled:
@@ -974,35 +1040,24 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         # Always parse Kakera Power from $tu to update local state (Scanning for Power: XX%)
         try:
             power_match = re.search(r"(?:power|poder):\s*\*{0,2}(\d+)%\*{0,2}", c_lower)
-            if power_match:
-
-                if getattr(client, "dk_just_used", False):
-                    client.dk_just_used = False
-
-                    log_function(
-                        f"[{client.muda_name}] Skipped stale power sync after DK use.",
-                        preset_name,
-                        "INFO"
-                    )
-
-                else:
-                    client.current_dk_power = int(power_match.group(1))
-                    client.last_dk_power_update_utc = datetime.datetime.now(
-                        datetime.timezone.utc
-                    )
+            if power_match and not dk_used_from_this_tu:
+                client.current_dk_power = int(power_match.group(1))
+                client.last_dk_power_update_utc = datetime.datetime.now(
+                    datetime.timezone.utc
+                )
 
             # Support EN, PT, ES, FR for consumption regex
-            consumption_match = re.search(r"(?:each kakera (?:reaction|button) consumes|cada (?:reação|botão|botón) de kakera consume|chaque bouton kakera consomme)\s*(\d+)%", c_lower)
+            consumption_match = re.search(r"(?:each kakera (?:reaction|button) consumes|cada (?:reaÃ§Ã£o|botÃ£o|botÃ³n) de kakera consume|chaque bouton kakera consomme)\s*(\d+)%", c_lower)
             if consumption_match:
                 client.dk_consumption = int(consumption_match.group(1))
                 client.dk_consumption_chaos = int(client.dk_consumption / 2)
             
             # Update dk_stock_count while we are here, in case dk_power_management was off
             # This ensures logs reflect reality even if management is disabled
-            dk_stock_match = re.search(r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[ií]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)", c_lower)
-            if dk_stock_match:
+            dk_stock_match = re.search(r"\*\*(\d+)\*\*\s*\$dk\s*(?:available|dispon[iÃ­]ve(?:l|is)|no estoque|disponible|en stock|disponibles?)", c_lower)
+            if dk_stock_match and not dk_used_from_this_tu:
                 client.dk_stock_count = int(dk_stock_match.group(1))
-            elif re.search(r"\$dk.*?(?:ready|pronto|disponible|prêt|dispon[ií]vel|listo)", c_lower):
+            elif not dk_used_from_this_tu and re.search(r"\$dk.*?(?:ready|pronto|disponible|prÃªt|dispon[iÃ­]vel|listo)", c_lower):
                 client.dk_stock_count = 1
 
         except Exception as e:
@@ -1013,9 +1068,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         # $rt Status
         # Multilingual support: EN, PT, ES, FR
-        # Keywords: available, pronto, disponible, prêt
-        rt_ready_keywords = ["$rt is available", "$rt está pronto", "$rt esta pronto", "$rt está disponível", 
-                             "$rt está disponible", "$rt est disponible", "$rt est prêt", "$rt is ready"]
+        # Keywords: available, pronto, disponible, prÃªt
+        rt_ready_keywords = ["$rt is available", "$rt estÃ¡ pronto", "$rt esta pronto", "$rt estÃ¡ disponÃ­vel", 
+                             "$rt estÃ¡ disponible", "$rt est disponible", "$rt est prÃªt", "$rt is ready"]
         rt_ready = any(x in c_lower for x in rt_ready_keywords)
         rt_reset_minutes = None
 
@@ -1044,7 +1099,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         # Regex for Claim Ready (Positive)
         # EN: you __can__ claim
-        # PT: você __pode__ se casar
+        # PT: vocÃª __pode__ se casar
         # ES: __puedes__ reclamar
         # FR: vous __pouvez__ vous marier / remarier
         claim_ready_pattern = r"__(?:can|pode|puedes|pouvez)__\s+(?:claim|se casar|reclamar|vous (?:re)?marier)"
@@ -1058,10 +1113,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         
         # Priority check for the "reset is in X min" line which usually appears when claiming is available (for next reset)
         # or when on cooldown.
-        match_claim_reset = re.search(r"(?:next claim|próximo|siguiente|prochain|tempo|temps|falta)\s+(?:reset|reclamo|tempo|temps|um tempo).*?(?:in|em|en|dans|left|restante|restant|falta|dentro de)\s*:?\s*\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
+        match_claim_reset = re.search(r"(?:next claim|prÃ³ximo|siguiente|prochain|tempo|temps|falta)\s+(?:reset|reclamo|tempo|temps|um tempo).*?(?:in|em|en|dans|left|restante|restant|falta|dentro de)\s*:?\s*\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
         
         # Alternative strict check for simple cooldown lines like "no puedes... 20 min"
-        match_claim_wait = re.search(r"(?:can't|não pode|no puedes|avant de).*?(?:claim|casar|reclamar|remarier).*?\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
+        match_claim_wait = re.search(r"(?:can't|nÃ£o pode|no puedes|avant de).*?(?:claim|casar|reclamar|remarier).*?\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
 
         # Extract time from best match
         best_match = match_claim_reset or match_claim_wait
@@ -1114,16 +1169,16 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             
         # Roll Reset Status (New in check_status for better sleep awareness)
         roll_reset_minutes = None
-        match_roll_reset = re.search(r"(?:reset in|reinicialização é em|siguiente reinicio.*?en|prochain rolls reset dans)\s+\*{0,2}(\d+h)?\*{0,2}\s*\*{0,2}(\d+)\*{0,2}\s*min", c_lower)
+        match_roll_reset = re.search(r"(?:reset in|reinicializaÃ§Ã£o Ã© em|siguiente reinicio.*?en|prochain rolls reset dans)\s+\*{0,2}(\d+h)?\*{0,2}\s*\*{0,2}(\d+)\*{0,2}\s*min", c_lower)
         if match_roll_reset:
             h_r, m_r = parse_hours_minutes(match_roll_reset)
             roll_reset_minutes = h_r * 60 + m_r
 
         # Kakera Status
-        if "you __can__ react" in c_lower or "pode reagir" in c_lower or "pegar kakera" in c_lower or "puedes__ reaccionar" in c_lower or "puedes reaccionar" in c_lower or "pouvez__ réagir" in c_lower or "pouvez réagir" in c_lower:
+        if "you __can__ react" in c_lower or "pode reagir" in c_lower or "pegar kakera" in c_lower or "puedes__ reaccionar" in c_lower or "puedes reaccionar" in c_lower or "pouvez__ rÃ©agir" in c_lower or "pouvez rÃ©agir" in c_lower:
             client.kakera_react_available = True
             client.kakera_react_cooldown_until_utc = None
-        elif "can't react" in c_lower or "não pode" in c_lower or "no puedes" in c_lower:
+        elif "can't react" in c_lower or "nÃ£o pode" in c_lower or "no puedes" in c_lower:
             client.kakera_react_available = False
             # Try to parse time
             match_k = re.search(r"(?:react|pegar|reaccionar).*?\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
@@ -1199,9 +1254,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             return int(digits) if digits else 0
 
         # Regex for rolls (singular/plural support for all languages)
-        # Unified Regex: "You have/Vous avez/Tienes/Você tem" ... (count) ... "rolls"
+        # Unified Regex: "You have/Vous avez/Tienes/VocÃª tem" ... (count) ... "rolls"
         # Captures: 1=count, 2=middle_text
-        main_match = re.search(r"(?:you have|vous avez|tienes|você tem)\s+\*{0,2}([\d,.]+)\*{0,2}\s+rolls?(.*?)(?:left|restantes?|restants?\b)", content_lower, re.DOTALL)
+        main_match = re.search(r"(?:you have|vous avez|tienes|vocÃª tem)\s+\*{0,2}([\d,.]+)\*{0,2}\s+rolls?(.*?)(?:left|restantes?|restants?\b)", content_lower, re.DOTALL)
         
         if main_match:
             rolls_left = parse_int_from_fragment(main_match.group(1))
@@ -1221,7 +1276,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             # Parse reset time
             # Unified Reset Regex: "Reset in... X min"
             # Matches: reset ... in/em/en/dans ... (Hh) Mm min
-            match_reset = re.search(r"(?:reset|reinicialização|reinicio).*?(?:in|em|en|dans)\s+(?:.*?)\*{0,2}(\d+h)?\*{0,2}\s*\*{0,2}(\d+)\*{0,2}\s*min", content_lower[main_match.end():])
+            match_reset = re.search(r"(?:reset|reinicializaÃ§Ã£o|reinicio).*?(?:in|em|en|dans)\s+(?:.*?)\*{0,2}(\d+h)?\*{0,2}\s*\*{0,2}(\d+)\*{0,2}\s*min", content_lower[main_match.end():])
             
             if match_reset:
                 h_r = parse_int_from_fragment(match_reset.group(1))
@@ -1256,7 +1311,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         await asyncio.sleep(2.0)
                         
                         client.us_pulled_this_cycle += amount_to_pull
-                        limit_str = str(client.auto_us_limit) if client.auto_us_limit > 0 else '∞'
+                        limit_str = str(client.auto_us_limit) if client.auto_us_limit > 0 else 'âˆž'
                         log_function(f"[{client.muda_name}] Auto $us triggered. Pulled {amount_to_pull} rolls. ({client.us_pulled_this_cycle}/{limit_str})", preset_name, "INFO")
                         
                         await start_roll_commands(client, channel, amount_to_pull, ignore_limit_for_post_roll, key_mode_only_kakera_for_post_roll)
@@ -1268,7 +1323,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 
                 # Check claim reset and timing window awareness
                 # Reuse the regex strategy from check_status for localized parsing
-                match_c = re.search(r"(?:next claim|próximo|siguiente|prochain|tempo|temps|falta)\s+(?:reset|reclamo|tempo|temps|um tempo).*?(?:in|em|en|dans|left|restante|restant|falta|dentro de)\s*:?\s*\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", content_lower, re.IGNORECASE)
+                match_c = re.search(r"(?:next claim|prÃ³ximo|siguiente|prochain|tempo|temps|falta)\s+(?:reset|reclamo|tempo|temps|um tempo).*?(?:in|em|en|dans|left|restante|restant|falta|dentro de)\s*:?\s*\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", content_lower, re.IGNORECASE)
                 if match_c:
                     hours = parse_int_from_fragment(match_c.group(1))
                     minutes = parse_int_from_fragment(match_c.group(2))
@@ -1336,6 +1391,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             try:
                 await send_roll_command(channel, roll_command)
                 await asyncio.sleep(get_roll_delay(client))
+                await maybe_use_dk_mid_roll(client, channel)
             except Exception:
                 await asyncio.sleep(1)
                 
@@ -1671,15 +1727,40 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             else:
                 target_list = client.kakera_emojis
             target_list = target_list + client.sphere_emojis
+            free_green_targets = set(
+                client.kakera_emojis +
+                client.chaos_emojis +
+                client.sphere_perk_emojis +
+                client.starwish_emojis +
+                client.sphere_emojis +
+                ['kakeraP']
+            )
+
+            def is_green_button(btn):
+                style = getattr(btn, "style", None)
+                if style == 3:
+                    return True
+                return getattr(style, "value", None) == 3
 
             cooldown_active = not is_kakera_reaction_allowed()
             clicked = False
             
-            # Check for KakeraP or Spheres (always safe)
-            has_p_or_sphere = msg.components and any(hasattr(b.emoji, 'name') and (b.emoji.name == 'kakeraP' or b.emoji.name in client.sphere_emojis) for c in msg.components for b in c.children)
+            # Check for KakeraP, spheres, or free green buttons (always safe)
+            has_free_button = msg.components and any(
+                hasattr(b.emoji, 'name') and (
+                    b.emoji.name == 'kakeraP' or
+                    b.emoji.name in client.sphere_emojis or
+                    (
+                        is_green_button(b) and
+                        (b.emoji.name in free_green_targets or b.emoji.name.rstrip('2') in free_green_targets)
+                    )
+                )
+                for c in msg.components
+                for b in c.children
+            )
             
             # Only abort early if cooldown is active AND there are no potential discounts/spheres
-            if cooldown_active and not has_p_or_sphere and chaos_count == 0 and not has_sphere_perk:
+            if cooldown_active and not has_free_button and chaos_count == 0 and not has_sphere_perk:
                 return False
 
             # Double Deduction Prevention: Check if we already reacted to this message
@@ -1697,7 +1778,13 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     for btn in comp.children:
                          if hasattr(btn.emoji, 'name') and btn.emoji.name:
                              emoji_name = btn.emoji.name
-                             if emoji_name in target_list or emoji_name.rstrip('2') in target_list:
+                             base_emoji_name = emoji_name.rstrip('2')
+                             is_target = emoji_name in target_list or base_emoji_name in target_list
+                             is_free_green_target = (
+                                 is_green_button(btn) and
+                                 (emoji_name in free_green_targets or base_emoji_name in free_green_targets)
+                             )
+                             if is_target or is_free_green_target:
                                  all_raw_buttons.append(btn)
 
                 # Priority Map (User Request: C > L > W > R > O > D > Y > G > T > kakera)
@@ -1733,7 +1820,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     name = btn.emoji.name
                     base_name = name.rstrip('2') if name else ""
                     
-                    is_green = hasattr(btn, "style") and btn.style == 3
+                    is_green = is_green_button(btn)
                     
                     # If this kakera is perfectly normal (no chaos, no perks) and we are on cooldown, skip it.
                     # Otherwise, rely on get_current_dk_power() < cost to block it.
@@ -1825,7 +1912,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         await btn.click()
                         # Debit power locally to prevent immediate subsequent spam
                         if cost > 0:
-                            client.current_dk_power = max(0, client.current_dk_power - cost)
+                            client.current_dk_power = max(0, get_current_dk_power() - cost)
+                            client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
                             client.kakera_reacted_messages.add(msg.id)
                         
                         log_function(f"[{client.muda_name}] Kakera clicked: {char_name} (Pw: {client.current_dk_power}%)", client.preset_name, "KAKERA")
@@ -1863,7 +1951,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         # Reaction fallback
         if not clicked_claim and has_claim_option(msg, embed, client.claim_emojis):
             try:
-                await msg.add_reaction("💖")
+                await msg.add_reaction("ðŸ’–")
                 log_function(f"[{client.muda_name}] Claiming {char_name}{kakera_str} (Reaction)", client.preset_name, "CLAIM")
                 # Reaction fallback
                 await verify_snipe_outcome(client, channel, char_name, is_snipe_action=is_snipe)
@@ -1923,6 +2011,41 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         # Suppress all activity during inactive hours
         if is_inactive_hour():
             return
+
+        # Handle Command Maintenance before embed/character filtering.
+        # Mudae sends this as plain message content, not necessarily as an embed description.
+        maintenance_parts = [message.content or ""]
+        if message.embeds:
+            maintenance_embed = message.embeds[0]
+            maintenance_parts.extend([
+                maintenance_embed.title or "",
+                maintenance_embed.description or "",
+                maintenance_embed.footer.text if maintenance_embed.footer else "",
+            ])
+            for field in maintenance_embed.fields:
+                maintenance_parts.extend([field.name or "", field.value or ""])
+
+        desc = " ".join(maintenance_parts).lower()
+
+        if "command under maintenance" in desc:
+            client.interrupt_rolling = True
+
+            if get_maintenance_remaining_seconds() > 0:
+                return
+
+            wait_seconds = 300 + random.randint(0, 30)
+            client.maintenance_until = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=wait_seconds)
+
+            log_function(
+                f"[{client.muda_name}] Maintenance detected. Pausing for 5 minutes.",
+                preset_name,
+                "ERROR"
+            )
+
+            await wait_for_maintenance_clear()
+            await check_status(client, message.channel, client.mudae_prefix)
+            return
+
         if not message.embeds: return
         embed = message.embeds[0]
 
@@ -1960,7 +2083,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         # Key Limit Check
         if client.rolling_enabled and client.is_actively_rolling:
             desc = embed.description or ""
-            if "limit of 1,000 keys" in desc or "limite de 1.000 chaves" in desc or "límite de 1.000 llaves" in desc:
+            if "limit of 1,000 keys" in desc or "limite de 1.000 chaves" in desc or "lÃ­mite de 1.000 llaves" in desc:
                 client.interrupt_rolling = True
                 client.key_limit_hit = True
                 log_function(f"[{client.muda_name}] Key Limit Hit. Pausing.", preset_name, "ERROR")
@@ -1968,19 +2091,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await asyncio.sleep(3600 + random.randint(0, 600))
                 await check_status(client, message.channel, client.mudae_prefix)
                 return
-
-        # Handle Command Maintenance 
-        desc = embed.description or ""
-        if "Command under maintenance" in desc.lower():
-            log_function(
-                f"[{client.muda_name}] Maintenance detected. Pausing for 5 minutes.",
-                preset_name,
-                "ERROR"
-            )
-
-            await asyncio.sleep(180 + random.randint(0, 30))
-            await check_status(client, message.channel, client.mudae_prefix)
-            return
 
         process = True
         
