@@ -41,4 +41,10 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Add event candle support (lazy - just added to sphere logic, so it should always click...)
 
 **31/05/2026:**
-- Fix $dk not resetting power to 100% 
+- Fix $dk not resetting power to 100%
+
+**12/06/2026:**
+- $dk now activates mid-roll session (rolls should pause for 3 seconds, $dk activates, then rolls resume after 3 additional seconds - this was required to avoid rate limit issues)
+- Maintenance is now actually detected properly
+- Green buttons should now be actually recognised and clicked
+- Added missing sphere button (red)
