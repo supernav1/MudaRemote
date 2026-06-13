@@ -29,6 +29,7 @@
         "humanization_enabled": true,
         "dk_power_management": true,
         "dk_activation_percent": 15,
+        "dk_reset_power": 120,
         "skip_initial_commands": true,
         "time_rolls_to_claim_reset": false,
         "rt_ignore_min_kakera_for_wishlist": true,
