@@ -50,3 +50,5 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **13/06/2026:**
 - Bonus rolls from Chaos Kakera now detected and automatically used at end of rolling session (no need to wait for $tu)
+- Max power now configurable (add a "dk_reset_power": line in presets) - when $dk is used, power is reset to the value in presets.json, e.g.:
+            ""dk_reset_power": 145,"
