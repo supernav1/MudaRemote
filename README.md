@@ -47,3 +47,6 @@ This fork is just for my own personal use with my own modifications. All credit 
 - $dk now activates mid-roll session (rolls should pause for 3 seconds, $dk activates, then rolls resume after 3 additional seconds - this was required to avoid rate limit issues)
 - Maintenance is now actually detected properly
 - Added missing sphere button (red)
+
+**13/06/2026:**
+- Bonus rolls from Chaos Kakera now detected and automatically used at end of rolling session (no need to wait for $tu)
