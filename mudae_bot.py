@@ -283,6 +283,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.processed_claim_messages = set() # Track already processed/claimed message IDs
     client.last_successfully_claimed_character = None # Prevent redundant RT on same name
     client._has_initialized = False # Tracks whether on_ready setup has already run (prevents duplicate $tu on reconnect)
+    client.skipped_kakera_buttons = {}  # msg.id -> [(btn, cost), ...] — pending kakera skipped due to insufficient power
 
     # Slash command internal state
     client.use_slash_rolls = bool(use_slash_rolls and Route is not None)
@@ -854,37 +855,66 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     async def maybe_use_dk_mid_roll(client, channel):
         if not client.dk_power_management:
             return False
-
         if client.dk_stock_count <= 0:
             return False
-
+        
+        last_dk_mid_roll = getattr(client, 'last_dk_mid_roll_ts', 0)
+        if (time.time() - last_dk_mid_roll) < 15:
+            return False
+        
+        # Claim the cooldown slot immediately to prevent concurrent calls from racing past this check
+        client.last_dk_mid_roll_ts = time.time()
+        
         current_power = get_current_dk_power()
         activation_percent = getattr(client, "dk_activation_percent", dk_activation_percent)
-
+    
         if current_power >= activation_percent:
             return False
-
+    
         log_function(
             f"[{client.muda_name}] DK: Mid-roll activation. Pausing before $dk. ({current_power}% < {activation_percent}%)",
             preset_name,
             "KAKERA"
         )
-
+    
         await asyncio.sleep(3)
         await channel.send(f"{client.mudae_prefix}dk")
         await asyncio.sleep(3)
-
-        client.current_dk_power = client.dk_reset_power
+    
+        client.current_dk_power = 100
         client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
         client.dk_stock_count = max(0, client.dk_stock_count - 1)
-
+    
         log_function(
-            f"[{client.muda_name}] DK: Local power reset to {client.dk_reset_power}%. Stock left: {client.dk_stock_count}",
+            f"[{client.muda_name}] DK: Local power reset to 100%. Stock left: {client.dk_stock_count}",
             preset_name,
             "INFO"
         )
+        
+        await retry_skipped_kakera(client, channel)  # add this line
 
         return True
+
+    async def retry_skipped_kakera(client, channel):
+        pending = getattr(client, 'skipped_kakera_buttons', {})
+        if not pending:
+            return
+        for msg_id, btn_list in list(pending.items()):
+            for btn, cost in btn_list:
+                current_pow = get_current_dk_power()
+                if current_pow < cost:
+                    continue
+                try:
+                    await btn.click()
+                    client.current_dk_power = max(0, get_current_dk_power() - cost)
+                    client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
+                    client._last_kakera_click_ts = time.time()
+                    log_function(f"[{client.muda_name}] Retried Kakera after $dk: {btn.emoji.name} (Pw: {client.current_dk_power}%)", client.preset_name, "KAKERA")
+                    await asyncio.sleep(0.5)
+                except Exception:
+                    pass
+            pending.pop(msg_id, None)
+
 
     async def snipe_only_status_loop(client, channel):
         """
@@ -1793,7 +1823,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             if len(client.kakera_reacted_messages) > 2000:
                 client.kakera_reacted_messages.clear()
 
-            skipped_due_to_power = []    
             if msg.components:
                 # Collect all valid buttons first
                 all_raw_buttons = []
@@ -1865,6 +1894,11 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     current_pow = get_current_dk_power()
                     
                     if cooldown_active and current_pow < cost:
+                        name_display = btn.emoji.name if hasattr(btn.emoji, 'name') else 'Kakera'
+                        if not hasattr(client, 'last_power_warn') or (time.time() - getattr(client, 'last_power_warn', 0) > 60):
+                            log_function(f"[{client.muda_name}] Insufficient Power ({current_pow}% < {cost}%). Skipping {name_display}.", client.preset_name, "WARN")
+                            client.last_power_warn = time.time()
+                        client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
                         continue
 
                     # Exempt KakeraP and Spheres from power consumption logic
@@ -1888,7 +1922,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         if not hasattr(client, 'last_power_warn') or (time.time() - getattr(client, 'last_power_warn', 0) > 60):
                             log_function(f"[{client.muda_name}] Insufficient Power ({current_pow}% < {cost}%). Skipping {name_display}.", client.preset_name, "WARN")
                             client.last_power_warn = time.time()
-                        skipped_due_to_power.append((btn, cost))
+                        client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
                         continue
                         
                     # Check custom power thresholds for specific kakera
@@ -1952,25 +1986,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         await asyncio.sleep(0.5)
                     except Exception:
                         pass
-
-                # Retry skipped buttons after potential $dk activation
-                if skipped_due_to_power and client.dk_stock_count > 0:
-                 dk_used = await maybe_use_dk_mid_roll(client, channel)
-                 if dk_used:
-                     for btn, cost in skipped_due_to_power:
-                         current_pow = get_current_dk_power()
-                         if current_pow < cost:
-                             continue
-                         try:
-                             await btn.click()
-                             client.current_dk_power = max(0, get_current_dk_power() - cost)
-                             client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
-                             client.kakera_reacted_messages.add(msg.id)
-                             client._last_kakera_click_ts = time.time()
-                             log_function(f"[{client.muda_name}] Retried Kakera after $dk: {btn.emoji.name} (Pw: {client.current_dk_power}%)", client.preset_name, "KAKERA")
-                             await asyncio.sleep(0.5)
-                         except Exception:
-                             pass                    
+         
             return clicked
 
         # Character Claim Logic
