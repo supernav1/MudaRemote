@@ -881,12 +881,12 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         await channel.send(f"{client.mudae_prefix}dk")
         await asyncio.sleep(3)
     
-        client.current_dk_power = 100
+        client.current_dk_power = client.dk_reset_power
         client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
         client.dk_stock_count = max(0, client.dk_stock_count - 1)
     
         log_function(
-            f"[{client.muda_name}] DK: Local power reset to 100%. Stock left: {client.dk_stock_count}",
+            f"[{client.muda_name}] DK: Local power reset to {client.dk_reset_power}%. Stock left: {client.dk_stock_count}",
             preset_name,
             "INFO"
         )
