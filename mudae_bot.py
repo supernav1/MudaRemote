@@ -181,6 +181,12 @@ def is_wished_by_self(message, client_user_id: int) -> bool:
     # Check if the bot user is among the mentioned users
     return client_user_id in [m.id for m in message.mentions]
 
+def is_green_button(btn):
+    style = getattr(btn, "style", None)
+    if style == 3:
+        return True
+    return getattr(style, "value", None) == 3
+
 def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_seconds, mudae_prefix,
             log_function, preset_name, key_mode, start_delay, snipe_mode, snipe_delay,
             snipe_ignore_min_kakera_reset, wishlist,
@@ -877,9 +883,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             "KAKERA"
         )
     
-        await asyncio.sleep(3)
+        await asyncio.sleep(4)
         await channel.send(f"{client.mudae_prefix}dk")
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
     
         client.current_dk_power = client.dk_reset_power
         client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
@@ -1018,10 +1024,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             # Match if either the username or display name matches
             return response_username == bot_username or response_username == bot_display_name
         
-        for _ in range(5):
-            tu_requested_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=1)
-            await send_tu_command(channel); await asyncio.sleep(2.5)
-            async for msg in channel.history(limit=10):
+        for _ in range(3):
+            tu_requested_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=3)
+            await send_tu_command(channel); await asyncio.sleep(5)
+            async for msg in channel.history(limit=3):
                 if msg.author.id == TARGET_BOT_ID and msg.content:
                     if msg.created_at < tu_requested_at:
                         continue
@@ -1329,6 +1335,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             
             # Only add $us to total. Ignoring $mk fixes the 0+1 loop bug.
             total_rolls = rolls_left + us_rolls_left
+            client.bonus_rolls_this_session = 0  # This is a safeguard for bonus rolls that might spawn on one of the last rolls, right before a $tu 
 
             if total_rolls == 0:
                 # AUTO $US LOGIC
@@ -1434,6 +1441,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             bonus = client.bonus_rolls_this_session
             client.bonus_rolls_this_session = 0
             log_function(f"[{client.muda_name}] Rolling {bonus} bonus rolls.", preset_name, "INFO")
+            await asyncio.sleep(3)  # Give any pending mid-roll $dk activation time to complete first
             client.is_actively_rolling = True
             client.interrupt_rolling = False
             for i in range(bonus):
@@ -1466,7 +1474,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         except Exception as e:
             log_function(f"[{client.muda_name}] Post-roll processing error: {e}", preset_name, "ERROR")
         
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
         await check_status(client, channel, client.mudae_prefix)
 
 
@@ -1787,12 +1795,6 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 ['PeepoClown', 'kakeraP']
             )
 
-            def is_green_button(btn):
-                style = getattr(btn, "style", None)
-                if style == 3:
-                    return True
-                return getattr(style, "value", None) == 3
-
             cooldown_active = not is_kakera_reaction_allowed()
             clicked = False
             
@@ -1968,8 +1970,18 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                             )
                             continue
 
-                    try:
-                        await btn.click()
+                    click_succeeded = False
+                    for attempt in range(2):
+                        try:
+                            await btn.click()
+                            click_succeeded = True
+                            break
+                        except Exception as e:
+                            log_function(f"[{client.muda_name}] Kakera click failed (attempt {attempt + 1}/2): {char_name} - {e}", client.preset_name, "ERROR")
+                            if attempt == 0:
+                                await asyncio.sleep(0.5)
+
+                    if click_succeeded:
                         # Debit power locally to prevent immediate subsequent spam
                         if cost > 0:
                             client.current_dk_power = max(0, get_current_dk_power() - cost)
@@ -1981,12 +1993,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         # Track kakera reaction time for spawned character detection
                         client._last_kakera_click_ts = time.time()
                         await asyncio.sleep(0.5)
-                    except Exception:
-                        pass
-                        await asyncio.sleep(0.5)
-                    except Exception:
-                        pass
-         
+                        # Check immediately in case this click dropped us below threshold
+                        if get_current_dk_power() < getattr(client, "dk_activation_percent", dk_activation_percent):
+                            await maybe_use_dk_mid_roll(client, channel)
+
             return clicked
 
         # Character Claim Logic
@@ -2113,7 +2123,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             return
 
         # Detect bonus rolls from chaos kakera rewards
-        if message.content and not message.embeds and client.rolling_enabled:
+        if message.content and not message.embeds and client.rolling_enabled and client.is_actively_rolling:
             bonus_roll_match = re.search(r"\+\**(\d+)\**\s*rolls?", message.content, re.IGNORECASE)
             if bonus_roll_match:
                 now_ts = time.time()
@@ -2279,14 +2289,14 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     process = False
 
                     
-        # Reactive Kakera on spawned characters (from kakera reactions) - always click free/green buttons
-        if process and not client.is_actively_rolling:
+        # Reactive Kakera on spawned characters (from kakera reactions) - click eligible/free green buttons
+        if process and client.is_actively_rolling:
             owner = get_character_owner(embed)
             is_own_character = owner and owner == client.user.name.lower()
-            spawned_by_me = (time.time() - getattr(client, '_last_kakera_click_ts', 0)) <= 10
+            is_spawned_message = message.type != discord.MessageType.chat_input_command
 
-            if is_own_character and spawned_by_me:
-                log_function(f"[{client.muda_name}] Green Kakera spawned via Chaos Kakera: {embed.author.name}!", preset_name, "KAKERA")
+            if is_own_character and is_spawned_message:
+                log_function(f"[{client.muda_name}] Kakera spawned via Chaos Kakera: {embed.author.name}!", preset_name, "KAKERA")
                 all_k = client.kakera_emojis + client.chaos_emojis + client.sphere_emojis + client.starwish_emojis
                 has_btn = False
                 if message.components:
@@ -2294,7 +2304,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         for b in c.children:
                             if hasattr(b.emoji, 'name') and b.emoji.name:
                                 e_name = b.emoji.name
-                                if e_name in all_k or e_name.rstrip('2') in all_k:
+                                if e_name in all_k or e_name.rstrip('2') in all_k or is_green_button(b):
                                     has_btn = True; break
                         if has_btn: break
                 
@@ -2302,8 +2312,16 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     delay_min, delay_max = client.reactive_kakera_delay_range
                     if delay_max > 0:
                         await asyncio.sleep(random.uniform(delay_min, delay_max))
-                    await claim_character(client, message.channel, message, is_kakera=True)                
+                    await claim_character(client, message.channel, message, is_kakera=True)        
 
+            if is_own_character and client.debug_mode:
+                log_function(
+                    f"[{client.muda_name}] [MSG DEBUG] type={message.type} "
+                    f"interaction_metadata={getattr(message, 'interaction_metadata', 'MISSING')} "
+                    f"interaction={getattr(message, 'interaction', 'MISSING')} "
+                    f"reference={message.reference}",
+                    preset_name, "INFO"
+                )
 
         # Reactive Kakera on own rolls (with humanized delay)
         if client.rolling_enabled and client.enable_reactive_self_snipe and client.is_actively_rolling and process:
