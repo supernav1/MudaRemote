@@ -56,3 +56,8 @@ This fork is just for my own personal use with my own modifications. All credit 
 **21/06/2026:**
 - Add safeguard to prevent mid roll $dk from firing multiple times
 - Store and retry missed kakera clicks after activating mid roll $dk
+
+**27/06/2026:**
+- Log and retry failed kakera clicks
+- Add safeguard 3s delay for rolling bonus rolls in case mid-roll $dk needs to be fired near end of main rolls
+- Refactor green kakera button detection 
