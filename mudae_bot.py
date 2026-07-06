@@ -24,7 +24,7 @@ except ImportError:
 
 # Bot Identification
 BOT_NAME = "MudaRemote"
-CURRENT_VERSION = "3.8"
+CURRENT_VERSION = "3.9"
 
 # Load config
 presets = {}
@@ -290,6 +290,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.last_successfully_claimed_character = None # Prevent redundant RT on same name
     client._has_initialized = False # Tracks whether on_ready setup has already run (prevents duplicate $tu on reconnect)
     client.skipped_kakera_buttons = {}  # msg.id -> [(btn, cost), ...] — pending kakera skipped due to insufficient power
+    client.dk_mid_roll_in_progress = False
 
     # Slash command internal state
     client.use_slash_rolls = bool(use_slash_rolls and Route is not None)
@@ -863,42 +864,39 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             return False
         if client.dk_stock_count <= 0:
             return False
-        
-        last_dk_mid_roll = getattr(client, 'last_dk_mid_roll_ts', 0)
-        if (time.time() - last_dk_mid_roll) < 15:
+        if client.dk_mid_roll_in_progress:
             return False
-        
-        # Claim the cooldown slot immediately to prevent concurrent calls from racing past this check
-        client.last_dk_mid_roll_ts = time.time()
-        
+
         current_power = get_current_dk_power()
         activation_percent = getattr(client, "dk_activation_percent", dk_activation_percent)
-    
+
         if current_power >= activation_percent:
             return False
-    
+
+        client.dk_mid_roll_in_progress = True
+
         log_function(
             f"[{client.muda_name}] DK: Mid-roll activation. Pausing before $dk. ({current_power}% < {activation_percent}%)",
             preset_name,
             "KAKERA"
         )
-    
+
         await asyncio.sleep(4)
         await channel.send(f"{client.mudae_prefix}dk")
         await asyncio.sleep(2)
-    
+
         client.current_dk_power = client.dk_reset_power
         client.last_dk_power_update_utc = datetime.datetime.now(datetime.timezone.utc)
         client.dk_stock_count = max(0, client.dk_stock_count - 1)
-    
+
         log_function(
             f"[{client.muda_name}] DK: Local power reset to {client.dk_reset_power}%. Stock left: {client.dk_stock_count}",
             preset_name,
             "INFO"
         )
-        
-        await retry_skipped_kakera(client, channel)  # add this line
 
+        await retry_skipped_kakera(client, channel)
+        client.dk_mid_roll_in_progress = False
         return True
 
     async def retry_skipped_kakera(client, channel):
@@ -1025,7 +1023,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             return response_username == bot_username or response_username == bot_display_name
         
         for _ in range(3):
-            tu_requested_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=3)
+            tu_requested_at = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=2)
             await send_tu_command(channel); await asyncio.sleep(5)
             async for msg in channel.history(limit=3):
                 if msg.author.id == TARGET_BOT_ID and msg.content:
@@ -1427,6 +1425,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         for i in range(rolls_left):
             if client.interrupt_rolling:
                 break
+            # Wait if a mid-roll $dk activation is in progress
+            while client.dk_mid_roll_in_progress:
+                await asyncio.sleep(0.5)
             try:
                 await send_roll_command(channel, roll_command)
                 await asyncio.sleep(get_roll_delay(client))
@@ -1447,6 +1448,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             for i in range(bonus):
                 if client.interrupt_rolling:
                     break
+                # Wait if a mid-roll $dk activation is in progress
+                while client.dk_mid_roll_in_progress:
+                    await asyncio.sleep(0.5)
                 try:
                     await send_roll_command(channel, roll_command)
                     await asyncio.sleep(get_roll_delay(client))
