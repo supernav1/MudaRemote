@@ -24,7 +24,7 @@ except ImportError:
 
 # Bot Identification
 BOT_NAME = "MudaRemote"
-CURRENT_VERSION = "3.9"
+CURRENT_VERSION = "3.8"
 
 # Load config
 presets = {}
@@ -1904,7 +1904,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         if not hasattr(client, 'last_power_warn') or (time.time() - getattr(client, 'last_power_warn', 0) > 60):
                             log_function(f"[{client.muda_name}] Insufficient Power ({current_pow}% < {cost}%). Skipping {name_display}.", client.preset_name, "WARN")
                             client.last_power_warn = time.time()
-                        client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
+                        if client.dk_stock_count > 0:
+                            client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
                         continue
 
                     # Exempt KakeraP and Spheres from power consumption logic
@@ -1928,7 +1929,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                         if not hasattr(client, 'last_power_warn') or (time.time() - getattr(client, 'last_power_warn', 0) > 60):
                             log_function(f"[{client.muda_name}] Insufficient Power ({current_pow}% < {cost}%). Skipping {name_display}.", client.preset_name, "WARN")
                             client.last_power_warn = time.time()
-                        client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
+                        if client.dk_stock_count > 0:
+                            client.skipped_kakera_buttons.setdefault(msg.id, []).append((btn, cost))
                         continue
                         
                     # Check custom power thresholds for specific kakera
