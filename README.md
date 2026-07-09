@@ -61,3 +61,6 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Log and retry failed kakera clicks
 - Add safeguard 3s delay for rolling bonus rolls in case mid-roll $dk needs to be fired near end of main rolls
 - Refactor green kakera button detection 
+
+**10/07/2026:**
+- Only store kakera to retry if $dk stock ≥1
