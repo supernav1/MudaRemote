@@ -71,6 +71,30 @@
             "kakeraO",
             "kakeraY"
         ],
+        "sphere_emojis": [
+            "spB",
+            "spT",
+            "spG",
+            "spY",
+            "spO",
+            "spR",
+            "spW",
+            "spL",
+            "spD",
+            "spB2",
+            "spT2",
+            "spG2",
+            "spY2",
+            "spO2",
+            "spR2",
+            "spW2",
+            "spL2",
+            "spD2",
+            "spU",
+            "spM",
+            "sp",
+            "🕯️"
+        ],
         "reactive_kakera_delay_range": [
             0.5,
             2.0
