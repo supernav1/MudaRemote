@@ -64,3 +64,7 @@ This fork is just for my own personal use with my own modifications. All credit 
 
 **10/07/2026:**
 - Only store kakera to retry if $dk stock ≥1
+
+**17/09/2026:**
+- Move spheres to presets.json for easier customisation when picky sphere clicking (late game)
+- More safeguards for maintenance pausing
