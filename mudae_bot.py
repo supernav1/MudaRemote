@@ -199,7 +199,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             dk_power_management, skip_initial_commands, use_slash_rolls, only_chaos,
             reactive_snipe_delay, time_rolls_to_claim_reset_preset,
             rt_ignore_min_kakera_for_wishlist_preset,
-            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset, starwish_emojis_preset,
+            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset, starwish_emojis_preset, sphere_emojis_preset,
             rt_only_self_rolls_preset, reactive_kakera_delay_range_preset,
             claim_interval_preset, roll_interval_preset, avoid_list,
             inactive_hours_preset,
@@ -343,7 +343,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.kakera_emojis = kakera_emojis_preset if kakera_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.chaos_emojis = chaos_emojis_preset if chaos_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.sphere_perk_emojis = sphere_perk_emojis_preset if sphere_perk_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
-    client.sphere_emojis = SPHERE_EMOJIS
+    client.sphere_emojis = sphere_emojis_preset if sphere_emojis_preset is not None else SPHERE_EMOJIS
     client.starwish_emojis = starwish_emojis_preset if starwish_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.kakera_power_thresholds = kakera_power_thresholds or {}
     client.kakera_priority = kakera_priority
@@ -1378,7 +1378,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             else:
                 log_detail = f" (+{us_rolls_left} $us)" if us_rolls_left > 0 else ""
                 log_function(f"[{client.muda_name}] Rolls: {total_rolls}{log_detail}. Reset: {reset_time_r}m", preset_name, "INFO")
-                await start_roll_commands(client, channel, total_rolls, ignore_limit_for_post_roll, key_mode_only_kakera_for_post_roll)
+                await start_roll_commands(client, channel, total_rolls + 1, ignore_limit_for_post_roll, key_mode_only_kakera_for_post_roll)
                 return
         else:
             log_function(f"[{client.muda_name}] Could not parse roll count.", preset_name, "ERROR")
@@ -2109,7 +2109,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         desc = " ".join(maintenance_parts).lower()
 
-        if "command under maintenance" in desc:
+        if "under maintenance" in desc or "reboot" in desc:
             client.interrupt_rolling = True
 
             if get_maintenance_remaining_seconds() > 0:
@@ -2130,14 +2130,11 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         # Detect bonus rolls from chaos kakera rewards
         if message.content and not message.embeds and client.rolling_enabled and client.is_actively_rolling:
-            bonus_roll_match = re.search(r"\+\**(\d+)\**\s*rolls?", message.content, re.IGNORECASE)
+            bonus_roll_match = re.search(r"\*\*?\+(\d+)\s*rolls?\*\*\s*this\s*hour\.?", message.content, re.IGNORECASE)
             if bonus_roll_match:
-                now_ts = time.time()
-                last_kakera_ts = getattr(client, '_last_kakera_click_ts', 0)
-                if (now_ts - last_kakera_ts) <= 10:
-                    bonus_count = int(bonus_roll_match.group(1))
-                    client.bonus_rolls_this_session += bonus_count
-                    log_function(f"[{client.muda_name}] Gained +{bonus_count} extra rolls from Kakera!", preset_name, "KAKERA")
+                bonus_count = int(bonus_roll_match.group(1))
+                client.bonus_rolls_this_session += bonus_count
+                log_function(f"[{client.muda_name}] Gained +{bonus_count} extra rolls from Kakera!", preset_name, "KAKERA")
         if not message.embeds: return
         embed = message.embeds[0]
 
@@ -2391,6 +2388,7 @@ def bot_lifecycle_wrapper(preset_name, preset_data):
                 preset_data.get("chaos_emojis", None),
                 preset_data.get("sphere_perk_emojis", None),
                 preset_data.get("starwish_emojis", None),
+                preset_data.get("sphere_emojis", None),
                 preset_data.get("rt_only_self_rolls", False),
                 preset_data.get("reactive_kakera_delay_range", [0.3, 1.0]),
                 preset_data.get("claim_interval", 180),
