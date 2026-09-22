@@ -199,7 +199,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             dk_power_management, skip_initial_commands, use_slash_rolls, only_chaos,
             reactive_snipe_delay, time_rolls_to_claim_reset_preset,
             rt_ignore_min_kakera_for_wishlist_preset,
-            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset, starwish_emojis_preset, sphere_emojis_preset,
+            claim_emojis_preset, kakera_emojis_preset, chaos_emojis_preset, sphere_perk_emojis_preset, starwish_emojis_preset, sphere_emojis_skip_preset,
             rt_only_self_rolls_preset, reactive_kakera_delay_range_preset,
             claim_interval_preset, roll_interval_preset, avoid_list,
             inactive_hours_preset,
@@ -343,7 +343,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.kakera_emojis = kakera_emojis_preset if kakera_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.chaos_emojis = chaos_emojis_preset if chaos_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.sphere_perk_emojis = sphere_perk_emojis_preset if sphere_perk_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
-    client.sphere_emojis = sphere_emojis_preset if sphere_emojis_preset is not None else SPHERE_EMOJIS
+    client.sphere_emojis = SPHERE_EMOJIS
+    client.sphere_emojis_skip = sphere_emojis_skip_preset or []
     client.starwish_emojis = starwish_emojis_preset if starwish_emojis_preset is not None else ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
     client.kakera_power_thresholds = kakera_power_thresholds or {}
     client.kakera_priority = kakera_priority
@@ -1887,6 +1888,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     # FIRST: determine cost
                     if is_green or base_name == 'PeepoClown' or base_name == 'kakeraP' or base_name in client.sphere_emojis:
                         cost = 0
+                        if base_name in client.sphere_emojis_skip:
+                            log_function(f"[{client.muda_name}] Sphere skipped (on skip list): {base_name}", client.preset_name, "INFO")
+                            continue
                     else:
                         base_cost = client.dk_consumption
                         calc_cost = base_cost
@@ -1911,6 +1915,9 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                     # Exempt KakeraP and Spheres from power consumption logic
                     if is_green or base_name == 'PeepoClown' or base_name == 'kakeraP' or base_name in client.sphere_emojis:
                         cost = 0
+                        if base_name in client.sphere_emojis_skip:
+                            log_function(f"[{client.muda_name}] Sphere skipped (on skip list): {base_name}", client.preset_name, "INFO")
+                            continue
                     else:
                         base_cost = client.dk_consumption
                         
@@ -2388,7 +2395,7 @@ def bot_lifecycle_wrapper(preset_name, preset_data):
                 preset_data.get("chaos_emojis", None),
                 preset_data.get("sphere_perk_emojis", None),
                 preset_data.get("starwish_emojis", None),
-                preset_data.get("sphere_emojis", None),
+                preset_data.get("sphere_emojis_skip", []),
                 preset_data.get("rt_only_self_rolls", False),
                 preset_data.get("reactive_kakera_delay_range", [0.3, 1.0]),
                 preset_data.get("claim_interval", 180),
