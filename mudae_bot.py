@@ -1097,6 +1097,13 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             elif not dk_used_from_this_tu and re.search(r"\$dk.*?(?:ready|pronto|disponible|prêt|dispon[ií]vel|listo)", c_lower):
                 client.dk_stock_count = 1
 
+            # Parse $dk cooldown when no stock available
+            dk_cooldown_minutes = None
+            dk_cooldown_match = re.search(r"next\s+\$dk\s+in\s+\*{0,2}(\d+h)?\s*(\d+)\*{0,2}\s*min", c_lower)
+            if dk_cooldown_match and client.dk_stock_count == 0:
+                h_dk, m_dk = parse_hours_minutes(dk_cooldown_match)
+                dk_cooldown_minutes = h_dk * 60 + m_dk
+
         except Exception as e:
             log_function(f"[{client.muda_name}] Error parsing Power/DK state: {e}", preset_name, "WARN")
 
@@ -1235,6 +1242,22 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
 
         immediate_roll = (client.rolling_enabled and proceed_to_rolls and 
                          (can_claim or client.key_mode or client.rt_available or is_timing_window))
+        
+        # Wait for $dk if it becomes available before rolls reset (with 5 min rolling buffer)
+        if (client.rolling_enabled and proceed_to_rolls and
+                client.dk_power_management and
+                client.dk_stock_count == 0 and
+                dk_cooldown_minutes is not None and
+                roll_reset_minutes is not None and
+                dk_cooldown_minutes <= (roll_reset_minutes - 5)):
+            log_function(
+                f"[{client.muda_name}] No $dk stock. $dk available in {dk_cooldown_minutes}m "
+                f"(rolls reset in {roll_reset_minutes}m). Waiting for $dk...",
+                preset_name, "INFO"
+            )
+            await asyncio.sleep(dk_cooldown_minutes * 60)
+            await check_status(client, channel, mudae_prefix)
+            return
         
         if immediate_roll:
             await check_rolls_left_tu(client, channel, mudae_prefix, log_function, preset_name,
@@ -1426,6 +1449,11 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
         for i in range(rolls_left):
             if client.interrupt_rolling:
                 break
+            # Pause if maintenance detected mid-roll
+            remaining = get_maintenance_remaining_seconds()
+            if remaining > 0:
+                log_function(f"[{client.muda_name}] Maintenance detected mid-roll. Pausing for {int(remaining)}s.", preset_name, "WARN")
+                await asyncio.sleep(remaining)            
             # Wait if a mid-roll $dk activation is in progress
             while client.dk_mid_roll_in_progress:
                 await asyncio.sleep(0.5)
@@ -1449,6 +1477,11 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             for i in range(bonus):
                 if client.interrupt_rolling:
                     break
+                # Pause if maintenance detected mid-roll
+                remaining = get_maintenance_remaining_seconds()
+                if remaining > 0:
+                    log_function(f"[{client.muda_name}] Maintenance detected mid-roll. Pausing for {int(remaining)}s.", preset_name, "WARN")
+                    await asyncio.sleep(remaining)
                 # Wait if a mid-roll $dk activation is in progress
                 while client.dk_mid_roll_in_progress:
                     await asyncio.sleep(0.5)
@@ -1778,7 +1811,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 return False
 
             has_starwish = "1163913219782492220" in (embed.description or "")
-            has_sphere_perk = "💎/2" in (embed.description or "")
+            has_sphere_perk = "💎/2" in (embed.description or "") or "⚡/2" in (embed.description or "")
             desc_text = embed.description or ""
             if is_snipe:
                 target_list = client.kakera_emojis
@@ -2132,7 +2165,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             )
 
             await wait_for_maintenance_clear()
-            await check_status(client, message.channel, client.mudae_prefix)
+            if not client.is_actively_rolling:
+                await check_status(client, message.channel, client.mudae_prefix)
             return
 
         # Detect bonus rolls from chaos kakera rewards
