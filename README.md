@@ -68,3 +68,7 @@ This fork is just for my own personal use with my own modifications. All credit 
 **22/09/2026:**
 - Add sphere skip list in presets
 - More safeguards for maintenance pausing
+
+**10/10/2026:**
+- Add support for updated sphere emoji (⚡)
+- Wait to roll if $dk is about to reset within roll window (allow 5 min for rolling)
