@@ -72,3 +72,6 @@ This fork is just for my own personal use with my own modifications. All credit 
 **10/10/2026:**
 - Add support for updated sphere emoji (⚡)
 - Wait to roll if $dk is about to reset within roll window (allow 5 min for rolling)
+
+**20/10/2026:**
+- Fix parallel check status issue after maintenance
