@@ -280,6 +280,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.snipe_watch = {} 
     client.snipe_watch_expiry_seconds = 180 
     client.snipe_globally_disabled_until = None
+    client.maintenance_recovery_pending = False
 
     # Kakera Power Management (Local Tracking)
     client.current_dk_power = 100
@@ -882,7 +883,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             "KAKERA"
         )
 
-        await asyncio.sleep(4)
+        await asyncio.sleep(5)
         await channel.send(f"{client.mudae_prefix}dk")
         await asyncio.sleep(2)
 
@@ -2165,8 +2166,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             )
 
             await wait_for_maintenance_clear()
-            if not client.is_actively_rolling:
+            if not client.is_actively_rolling and not client.maintenance_recovery_pending:
+                client.maintenance_recovery_pending = True
                 await check_status(client, message.channel, client.mudae_prefix)
+                client.maintenance_recovery_pending = False
             return
 
         # Detect bonus rolls from chaos kakera rewards
