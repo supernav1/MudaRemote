@@ -74,4 +74,8 @@ This fork is just for my own personal use with my own modifications. All credit 
 - Wait to roll if $dk is about to reset within roll window (allow 5 min for rolling)
 
 **20/10/2026:**
-- Fix parallel check status issue after maintenance
+- Better maintenance handling
+
+**02/11/2026:**
+- Even better maintenance handling
+- Fix event claims not working
