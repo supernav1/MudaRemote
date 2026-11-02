@@ -53,7 +53,7 @@ COLORS = {
 }
 
 # Heart buttons
-CLAIM_EMOJIS = ['💖', '💗', '💘', '❤️', '💓', '💕', '♥️']
+CLAIM_EMOJIS = ['💖', '💗', '💘', '❤️', '💓', '💕', '♥️', '🍬', '🍭']
 
 # Standard Kakera
 KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
@@ -62,7 +62,7 @@ KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP
 CHAOS_KAKERA_EMOJIS = ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
 
 # Sphere Emojis (Do not consume power)
-SPHERE_EMOJIS = ['sp', 'spP', 'spB', 'spT', 'spG', 'spY', 'spO', 'spR', 'spW', 'spL', 'spD', 'spP2', 'spB2', 'spT2', 'spG2', 'spY2', 'spO2', 'spR2', 'spW2', 'spL2', 'spD2', 'spU', 'spM', '🕯️']
+SPHERE_EMOJIS = ['sp', 'spP', 'spB', 'spT', 'spG', 'spY', 'spO', 'spR', 'spW', 'spL', 'spD', 'spP2', 'spB2', 'spT2', 'spG2', 'spY2', 'spO2', 'spR2', 'spW2', 'spL2', 'spD2', 'spU', 'spM', '🕯️', '🍭', '🍬]']
 
 # Starwish Kakera
 STARWISH_EMOJIS: ['kakeraY', 'kakeraO', 'kakeraR', 'kakeraW', 'kakeraL', 'kakeraP', 'kakeraD', 'kakeraC']
@@ -280,7 +280,7 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
     client.snipe_watch = {} 
     client.snipe_watch_expiry_seconds = 180 
     client.snipe_globally_disabled_until = None
-    client.maintenance_recovery_pending = False
+    client.check_status_active = 0
 
     # Kakera Power Management (Local Tracking)
     client.current_dk_power = 100
@@ -988,8 +988,14 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 # Passively sleep in short bursts to allow for responsive shutdown or state checks
                 await asyncio.sleep(10)
 
-
     async def check_status(client, channel, mudae_prefix, proceed_to_rolls: bool = True):
+        client.check_status_active += 1
+        try:
+            return await _check_status_inner(client, channel, mudae_prefix, proceed_to_rolls)
+        finally:
+            client.check_status_active -= 1
+
+    async def _check_status_inner(client, channel, mudae_prefix, proceed_to_rolls: bool = True):
         await wait_for_maintenance_clear()
 
         log_function(f"[{client.muda_name}] Checking $tu...", client.preset_name, "CHECK")
@@ -2066,7 +2072,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                             # Snipe Verification Logic (is_snipe tells us if it was external)
                             # If we clicked, we verify if we actually won
                             # For regular rolling (not snipes), is_snipe is False -> "Claim Verification"
-                            await verify_snipe_outcome(client, channel, char_name, is_snipe_action=is_snipe)
+                            if not is_free_claim:
+                                await verify_snipe_outcome(client, channel, char_name, is_snipe_action=is_snipe)
                             return True
                         except Exception:
                             continue
@@ -2077,7 +2084,8 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 await msg.add_reaction("💖")
                 log_function(f"[{client.muda_name}] Claiming {char_name}{kakera_str} (Reaction)", client.preset_name, "CLAIM")
                 # Reaction fallback
-                await verify_snipe_outcome(client, channel, char_name, is_snipe_action=is_snipe)
+                if not is_free_claim:
+                    await verify_snipe_outcome(client, channel, char_name, is_snipe_action=is_snipe)
                 return True
             except Exception:
                 return False
@@ -2166,10 +2174,10 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
             )
 
             await wait_for_maintenance_clear()
-            if not client.is_actively_rolling and not client.maintenance_recovery_pending:
-                client.maintenance_recovery_pending = True
+            # Only start a recovery check if no check_status chain is already alive;
+            # a live chain resumes by itself once maintenance clears.
+            if client.check_status_active == 0:
                 await check_status(client, message.channel, client.mudae_prefix)
-                client.maintenance_recovery_pending = False
             return
 
         # Detect bonus rolls from chaos kakera rewards
@@ -2226,6 +2234,12 @@ def run_bot(token, prefix, target_channel_id, roll_command, min_kakera, delay_se
                 return
 
         process = True
+
+        # Free event cards: claim immediately, even mid-roll (buttons expire quickly)
+        if is_free_event(embed):
+            print_log(f"Free event card spotted: {embed.author.name}", client.preset_name, "CLAIM")
+            if await claim_character(client, message.channel, message, is_free_claim=True):
+                process = False
         
         # Self-snipe (Reactive)
         if client.rolling_enabled and client.enable_reactive_self_snipe and client.is_actively_rolling:
